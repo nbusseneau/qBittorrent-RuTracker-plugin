@@ -23,8 +23,8 @@ class rutracker(object):
     search_url = 'http://rutracker.org/forum/tracker.php'
 
     # Your username and password.
-    credentials = {'login_username': 'your_username',
-                   'login_password': 'your_password',
+    credentials = {'login_username': 'your_jonul1971',
+                   'login_password': 'your_zRkle',
                    'login': '\xc2\xf5\xee\xe4',}
 
     def __init__(self):
