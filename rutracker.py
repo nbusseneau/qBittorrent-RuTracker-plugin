@@ -83,7 +83,8 @@ class rutracker(object):
                                  'link': None,
                                  'size': None,
                                  'seeds': None,
-                                 'leech': None,}
+                                 'leech': None,
+                                 'desc_link': None,}
 
         def close(self):
             """Override default close() method just to define additional processing."""
@@ -128,6 +129,7 @@ class rutracker(object):
                 elif self.cat_re.search(params['href']):
                     self.current_item['cat'] = True
                 elif 'data-topic_id' in params and self.name_re.search(params['href']): # data-topic_id is needed to avoid conflicts.
+                    self.current_item['desc_link'] = 'http://rutracker.org/forum'+params['href'][1:]
                     self.current_item['name'] = True
                 # If we're on the first page of results, we search for other pages.
                 elif self.first_page:
