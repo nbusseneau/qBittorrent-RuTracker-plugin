@@ -84,7 +84,7 @@ class rutracker(object):
                                  'size': None,
                                  'seeds': None,
                                  'leech': None,
-			     'desc_link': None,}
+                                 'desc_link': None,}
 
         def close(self):
             """Override default close() method just to define additional processing."""
