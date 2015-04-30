@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.00
+#VERSION: 1.01
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
 import cookielib
@@ -186,6 +186,7 @@ class rutracker(object):
     def search(self, what, cat='all'):
         """Search for what on the search engine."""
         # Search on first page.
+        what = urllib.unquote(what)
         logging.info("Searching for {}...".format(what))
         logging.info("Parsing page 1.")
         (total, pages) = self.parse_search(what)
