@@ -1,14 +1,28 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.01
+#VERSION: 1.02
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
-import cookielib
-import urllib
-import urllib2
+# Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
+try:
+    import cookielib
+except ImportError:
+    import http.cookiejar as cookielib
+    
+try:    
+    from urllib import urlencode, quote, unquote
+    from urllib2 import build_opener, HTTPCookieProcessor
+except ImportError:
+    from urllib.parse import urlencode, quote, unquote
+    from urllib.request import build_opener, HTTPCookieProcessor
+
+try:
+    from HTMLParser import HTMLParser
+except ImportError:
+    from html.parser import HTMLParser
+    
 import tempfile
 import os
-import sgmllib
 import re
 import logging
 
@@ -23,18 +37,18 @@ class rutracker(object):
     search_url = 'http://rutracker.org/forum/tracker.php'
 
     # Your username and password.
-    credentials = {'login_username': 'your_username',
-                   'login_password': 'your_password',
+    credentials = {'login_username': 'YOUR_USERNAME_HERE',
+                   'login_password': 'YOUR_PASSWORD_HERE',
                    'login': '\xc2\xf5\xee\xe4',}
 
     def __init__(self):
         """Initialize rutracker search engine, signing in using given credentials."""
         # Initialize cookie handler.
         self.cj = cookielib.CookieJar()
-        self.opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(self.cj))
+        self.opener = build_opener(HTTPCookieProcessor(self.cj))
         # Send POST information and sign in.
         logging.info("Trying to connect using given credentials.")
-        self.opener.open(self.login_url, urllib.urlencode(self.credentials))
+        self.opener.open(self.login_url, urlencode(self.credentials).encode('utf-8'))
         # Check if connection was successful using cookies.
         if not 'bb_data' in [cookie.name for cookie in self.cj]:
             logging.error("Unable to connect using given credentials.")
@@ -46,26 +60,26 @@ class rutracker(object):
         """Download file at url and write it to a file, print the path to the file and the url."""
         # Make temp file.
         file, path = tempfile.mkstemp()
-        file = os.fdopen(file, "w")
-        # Set up fake bb_dl cookie, needed to trick the server into sending the file.
+        file = os.fdopen(file, "wb")
+        # Set up fake POST params, needed to trick the server into sending the file.
         id = re.search(r'dl\.php\?t=(\d+)', url).group(1)
-        download_cookie = cookielib.Cookie(version=0, name='bb_dl', value=id, port=None, port_specified=False, domain='.rutracker.org', domain_specified=True, domain_initial_dot=True, path='/forum/', path_specified=True, secure=False, expires=None, discard=False, comment=None, comment_url=None, rest={'HttpOnly': None}, rfc2109=False)
-        self.cj.set_cookie(download_cookie)
+        post = {'t': id,
+                'form_token': "dea8501bf5c49732084becf081b069d4",}
         # Download torrent file at url.
-        data = self.opener.open(url).read()
+        data = self.opener.open(url, urlencode(post).encode('utf-8')).read()
         # Write it to a file.
         file.write(data)
         file.close()
         # Print file path and url.
-        print path+" "+url
+        print(path+" "+url)
 
-    class SimpleSGMLParser(sgmllib.SGMLParser):
-        """Implement sgmllib.SGMLParser to parse results pages."""
+    class Parser(HTMLParser):
+        """Implement a simple HTML parser to parse results pages."""
         
-        def __init__(self, url, first_page=True):
+        def __init__(self, download_url, first_page=True):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
-            sgmllib.SGMLParser.__init__(self)
-            self.download_url = url
+            HTMLParser.__init__(self)
+            self.download_url = download_url
             self.first_page = first_page
             self.results = []
             self.other_pages = []
@@ -91,7 +105,7 @@ class rutracker(object):
             # We add last item found manually because items are added on new
             # <tr class="tCenter"> and not on </tr> (can't do it without the attribute).
             self.results.append(self.current_item)
-            sgmllib.SGMLParser.close(self)
+            HTMLParser.close(self)
             
         def handle_data(self, data):
             """Retrieve inner text information based on rules defined in do_tag()."""
@@ -99,6 +113,13 @@ class rutracker(object):
                 if self.current_item[key] == True:
                     self.current_item[key] = data
                     logging.debug((self.tr_counter, key, data))
+
+        def handle_starttag(self, tag, attrs):
+            """Pass along tag and attributes to dedicated handlers. Discard any tag without handler."""
+            try:
+                getattr(self, 'do_{}'.format(tag))(attrs)
+            except:
+                pass
 
         def do_tr(self, attr):
             """<tr class="tCenter"> is the big container for one torrent, so we store current_item and reset it."""
@@ -169,8 +190,8 @@ class rutracker(object):
         """Search for what starting on specified page. Defaults to first page of results."""
         logging.debug("parse_search({}, {}, {})".format(what, start, first_page))
         # Search.
-        parser = self.SimpleSGMLParser(self.download_url, first_page)
-        page = self.opener.open('{}?nm={}&start={}'.format(self.search_url, urllib.quote(what), start))
+        parser = self.Parser(self.download_url, first_page)
+        page = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
         data = page.read().decode('cp1251')
         parser.feed(data)
         parser.close()
@@ -186,7 +207,7 @@ class rutracker(object):
     def search(self, what, cat='all'):
         """Search for what on the search engine."""
         # Search on first page.
-        what = urllib.unquote(what)
+        what = unquote(what)
         logging.info("Searching for {}...".format(what))
         logging.info("Parsing page 1.")
         (total, pages) = self.parse_search(what)
