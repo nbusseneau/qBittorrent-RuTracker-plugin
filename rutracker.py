@@ -3,6 +3,12 @@
 #VERSION: 1.02
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
+# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
+credentials = {
+    'login_username': 'YOUR_USERNAME_HERE',
+    'login_password': 'YOUR_PASSWORD_HERE',
+}
+
 # Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
 try:
     import cookielib
@@ -36,16 +42,15 @@ class rutracker(object):
     download_url = 'http://dl.rutracker.org/forum/'
     search_url = 'http://rutracker.org/forum/tracker.php'
 
-    # Your username and password.
-    credentials = {'login_username': 'YOUR_USERNAME_HERE',
-                   'login_password': 'YOUR_PASSWORD_HERE',
-                   'login': '\xc2\xf5\xee\xe4',}
-
     def __init__(self):
         """Initialize rutracker search engine, signing in using given credentials."""
         # Initialize cookie handler.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
+        self.credentials = credentials
+        # Add submit button additional param: name="login" value="вход"
+        self.credentials['login'] = '\xc2\xf5\xee\xe4'
+        
         # Send POST information and sign in.
         logging.info("Trying to connect using given credentials.")
         self.opener.open(self.login_url, urlencode(self.credentials).encode('utf-8'))
