@@ -36,10 +36,10 @@ from novaprinter import prettyPrinter
 
 def dict_encode(dict, encoding='cp1251'):
     """Encode dict values to encoding (default: cp1251)."""
-    cp1251 = {}
+    encoded_dict = {}
     for key in dict:
-        cp1251[key] = dict[key].encode(encoding)
-    return cp1251
+        encoded_dict[key] = dict[key].encode(encoding)
+    return encoded_dict
 
 class rutracker(object):
     """rutracker.org search engine plugin for qBittorrent."""
