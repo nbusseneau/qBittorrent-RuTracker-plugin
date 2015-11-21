@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.02
+#VERSION: 1.03
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
 credentials = {
-    'login_username': 'YOUR_USERNAME_HERE',
-    'login_password': 'YOUR_PASSWORD_HERE',
+    'login_username': u'YOUR_USERNAME_HERE',
+    'login_password': u'YOUR_PASSWORD_HERE',
 }
 
 # Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
@@ -34,6 +34,13 @@ import logging
 
 from novaprinter import prettyPrinter
 
+def dict_encode(dict, encoding='cp1251'):
+    """Encode dict values to encoding (default: cp1251)."""
+    cp1251 = {}
+    for key in dict:
+        cp1251[key] = dict[key].encode(encoding)
+    return cp1251
+
 class rutracker(object):
     """rutracker.org search engine plugin for qBittorrent."""
     url = 'http://rutracker.org'
@@ -48,12 +55,11 @@ class rutracker(object):
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.credentials = credentials
-        # Add submit button additional param: name="login" value="вход"
-        self.credentials['login'] = '\xc2\xf5\xee\xe4'
-        
+        # Add submit button additional POST param
+        self.credentials['login'] = u'Вход'
         # Send POST information and sign in.
         logging.info("Trying to connect using given credentials.")
-        self.opener.open(self.login_url, urlencode(self.credentials).encode('utf-8'))
+        self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
         # Check if connection was successful using cookies.
         if not 'bb_data' in [cookie.name for cookie in self.cj]:
             logging.error("Unable to connect using given credentials.")
@@ -68,10 +74,10 @@ class rutracker(object):
         file = os.fdopen(file, "wb")
         # Set up fake POST params, needed to trick the server into sending the file.
         id = re.search(r'dl\.php\?t=(\d+)', url).group(1)
-        post = {'t': id,
-                'form_token': "dea8501bf5c49732084becf081b069d4",}
+        post_params = {'t': id,
+                       'form_token': "dea8501bf5c49732084becf081b069d4",}
         # Download torrent file at url.
-        data = self.opener.open(url, urlencode(post).encode('utf-8')).read()
+        data = self.opener.open(url, urlencode(dict_encode(post_params)).encode()).read()
         # Write it to a file.
         file.write(data)
         file.close()
