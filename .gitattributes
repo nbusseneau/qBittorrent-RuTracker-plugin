@@ -1,0 +1,11 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# CRLF for .py and .md will be easier for people downloading the plugin on Windows
+*.py eol=crlf
+*.md eol=crlf
+
+# Remove files from deployment using 'git archive'
+# git files
+.gitattributes export-ignore
+.gitignore export-ignore
