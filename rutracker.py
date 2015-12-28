@@ -64,14 +64,13 @@ class rutracker(object):
             response = self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
             # Check if response status is OK.
             if response.getcode() != 200:
-                logging.error("HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()))
+                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
             # Check if login was successful using cookies.
             if not 'bb_data' in [cookie.name for cookie in self.cj]:
-                logging.error("Unable to connect using given credentials.")
                 raise ValueError("Unable to connect using given credentials.")
             else:
                 logging.info("Login successful.")
-        except HTTPError as e:
+        except (HTTPError, ValueError) as e:
             logging.error(e)
 
     def download_torrent(self, url):
@@ -88,8 +87,7 @@ class rutracker(object):
             response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
             # Only continue if response status is OK.
             if response.getcode() != 200:
-                logging.error("HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()))
-                return
+                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
         except HTTPError as e:
             logging.error(e)
             return
@@ -222,8 +220,7 @@ class rutracker(object):
             response = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
             # Only continue if response status is OK.
             if response.getcode() != 200:
-                logging.error("HTTP request failed with status: {}".format(response.getcode()))
-                return
+                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
         except HTTPError as e:
             logging.error(e)
             return
@@ -238,6 +235,11 @@ class rutracker(object):
             if __name__ != "__main__": # This is just to avoid printing when I debug.
                 prettyPrinter(torrent)
 
+        # If no torrent were found, stop immediately
+        if parser.tr_counter == 0:
+            return
+            
+        # Else return number of torrents found
         return (parser.tr_counter, parser.other_pages)
 
     def search(self, what, cat='all'):
@@ -246,14 +248,23 @@ class rutracker(object):
         what = unquote(what)
         logging.info("Searching for {}...".format(what))
         logging.info("Parsing page 1.")
-        (total, pages) = self.parse_search(what)
+        results = self.parse_search(what)
+        
+        # If no results, stop
+        if results == None:
+            return
+            
+        # Else return current count (total) and all pages found
+        (total, pages) = results
         logging.info("{} pages of results found.".format(len(pages)+1))
 
-        # Repeat for each page of results.
+        # Repeat search for each page of results.
         for start in pages:
             logging.info("Parsing page {}.".format(int(start)/50+1))
-            (counter, _) = self.parse_search(what, start, False)
-            total += counter
+            results = self.parse_search(what, start, False)
+            if results != None:
+                (counter, _) = results
+                total += counter
         
         logging.info("{} torrents found.".format(total))
 
