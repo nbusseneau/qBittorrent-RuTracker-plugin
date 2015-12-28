@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.03
+#VERSION: 1.04
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
@@ -17,10 +17,11 @@ except ImportError:
     
 try:    
     from urllib import urlencode, quote, unquote
-    from urllib2 import build_opener, HTTPCookieProcessor
+    from urllib2 import build_opener, HTTPCookieProcessor, HTTPError
 except ImportError:
     from urllib.parse import urlencode, quote, unquote
     from urllib.request import build_opener, HTTPCookieProcessor
+    from urllib.error import HTTPError
 
 try:
     from HTMLParser import HTMLParser
@@ -55,17 +56,23 @@ class rutracker(object):
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.credentials = credentials
-        # Add submit button additional POST param
+        # Add submit button additional POST param.
         self.credentials['login'] = u'Вход'
         # Send POST information and sign in.
-        logging.info("Trying to connect using given credentials.")
-        self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
-        # Check if connection was successful using cookies.
-        if not 'bb_data' in [cookie.name for cookie in self.cj]:
-            logging.error("Unable to connect using given credentials.")
-            raise ValueError("Unable to connect using given credentials.")
-        else:
-            logging.info("Connection succesful.")
+        try:
+            logging.info("Trying to connect using given credentials.")
+            response = self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
+            # Check if response status is OK.
+            if response.getcode() != 200:
+                logging.error("HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()))
+            # Check if login was successful using cookies.
+            if not 'bb_data' in [cookie.name for cookie in self.cj]:
+                logging.error("Unable to connect using given credentials.")
+                raise ValueError("Unable to connect using given credentials.")
+            else:
+                logging.info("Login successful.")
+        except HTTPError as e:
+            logging.error(e)
 
     def download_torrent(self, url):
         """Download file at url and write it to a file, print the path to the file and the url."""
@@ -77,8 +84,17 @@ class rutracker(object):
         post_params = {'t': id,
                        'form_token': "dea8501bf5c49732084becf081b069d4",}
         # Download torrent file at url.
-        data = self.opener.open(url, urlencode(dict_encode(post_params)).encode()).read()
+        try:
+            response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
+            # Only continue if response status is OK.
+            if response.getcode() != 200:
+                logging.error("HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()))
+                return
+        except HTTPError as e:
+            logging.error(e)
+            return
         # Write it to a file.
+        data = response.read()
         file.write(data)
         file.close()
         # Print file path and url.
@@ -202,8 +218,17 @@ class rutracker(object):
         logging.debug("parse_search({}, {}, {})".format(what, start, first_page))
         # Search.
         parser = self.Parser(self.download_url, first_page)
-        page = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
-        data = page.read().decode('cp1251')
+        try:
+            response = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
+            # Only continue if response status is OK.
+            if response.getcode() != 200:
+                logging.error("HTTP request failed with status: {}".format(response.getcode()))
+                return
+        except HTTPError as e:
+            logging.error(e)
+            return
+        
+        data = response.read().decode('cp1251')
         parser.feed(data)
         parser.close()
         
