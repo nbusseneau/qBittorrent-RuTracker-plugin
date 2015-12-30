@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.04
+#VERSION: 1.04a
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
@@ -17,11 +17,11 @@ except ImportError:
     
 try:    
     from urllib import urlencode, quote, unquote
-    from urllib2 import build_opener, HTTPCookieProcessor, HTTPError
+    from urllib2 import build_opener, HTTPCookieProcessor, URLError, HTTPError
 except ImportError:
     from urllib.parse import urlencode, quote, unquote
     from urllib.request import build_opener, HTTPCookieProcessor
-    from urllib.error import HTTPError
+    from urllib.error import URLError, HTTPError
 
 try:
     from HTMLParser import HTMLParser
@@ -70,7 +70,7 @@ class rutracker(object):
                 raise ValueError("Unable to connect using given credentials.")
             else:
                 logging.info("Login successful.")
-        except (HTTPError, ValueError) as e:
+        except (URLError, HTTPError, ValueError) as e:
             logging.error(e)
 
     def download_torrent(self, url):
@@ -88,7 +88,7 @@ class rutracker(object):
             # Only continue if response status is OK.
             if response.getcode() != 200:
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
-        except HTTPError as e:
+        except (URLError, HTTPError) as e:
             logging.error(e)
             return
         # Write it to a file.
@@ -221,7 +221,7 @@ class rutracker(object):
             # Only continue if response status is OK.
             if response.getcode() != 200:
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
-        except HTTPError as e:
+        except (URLError, HTTPError) as e:
             logging.error(e)
             return
         
