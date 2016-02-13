@@ -1,4 +1,4 @@
-qBittorent rutracker.org plugin
+qBittorrent rutracker.org plugin
 ===============================
 
 qBittorrent search engine plugin for rutracker.org.
@@ -7,7 +7,7 @@ Nothing fancy, it follows the [writing plugin guide recommandations](https://git
 
 Installation
 ------------
-* [Download the latest release.](https://github.com/Skymirrh/qBittorent-rutracker-plugin/releases/latest)
+* [Download the latest release.](https://github.com/Skymirrh/qBittorrent-rutracker-plugin/releases/latest)
 * Edit `rutracker.py` by replacing `YOUR_USERNAME_HERE` and `YOUR_PASSWORD_HERE` with your rutracker.org username and password.
 * Move `rutracker.py` and `rutracker.png` to qBittorrent search engines folder:
   * Windows: `%localappdata%\qBittorrent\nova3\engines\`
