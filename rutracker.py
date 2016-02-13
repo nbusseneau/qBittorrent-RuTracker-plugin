@@ -80,8 +80,7 @@ class rutracker(object):
         file = os.fdopen(file, "wb")
         # Set up fake POST params, needed to trick the server into sending the file.
         id = re.search(r'dl\.php\?t=(\d+)', url).group(1)
-        post_params = {'t': id,
-                       'form_token': "dea8501bf5c49732084becf081b069d4",}
+        post_params = {'t': id,}
         # Download torrent file at url.
         try:
             response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
