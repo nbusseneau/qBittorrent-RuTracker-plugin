@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """rutracker.org search engine plugin for qBittorrent."""
-#VERSION: 1.04a
+#VERSION: 1.05
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
