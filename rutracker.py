@@ -5,8 +5,8 @@
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
 credentials = {
-    'login_username': u'dreamerback',
-    'login_password': u'onelife0*',
+    'login_username': u'YOUR_USERNAME_HERE',
+    'login_password': u'YOUR_PASSWORD_HERE*',
 }
 
 # Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
