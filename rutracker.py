@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""rutracker.org search engine plugin for qBittorrent."""
+"""rutracker.nl search engine plugin for qBittorrent."""
 #VERSION: 1.05
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
-# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
+# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.nl username and password
 credentials = {
     'login_username': u'YOUR_USERNAME_HERE',
     'login_password': u'YOUR_PASSWORD_HERE',
@@ -43,12 +43,12 @@ def dict_encode(dict, encoding='cp1251'):
     return encoded_dict
 
 class rutracker(object):
-    """rutracker.org search engine plugin for qBittorrent."""
-    url = 'https://rutracker.org'
-    name = 'rutracker.org'
-    login_url = 'https://rutracker.org/forum/login.php'
-    download_url = 'https://rutracker.org/forum/dl.php'
-    search_url = 'https://rutracker.org/forum/tracker.php'
+    """rutracker.nl search engine plugin for qBittorrent."""
+    url = 'https://rutracker.nl'
+    name = 'rutracker.nl'
+    login_url = 'https://rutracker.nl/forum/login.php'
+    download_url = 'https://rutracker.nl/forum/dl.php'
+    search_url = 'https://rutracker.nl/forum/tracker.php'
 
     def __init__(self):
         """Initialize rutracker search engine, signing in using given credentials."""
@@ -169,8 +169,8 @@ class rutracker(object):
                 if self.cat_re.search(params['href']):
                     self.current_item['cat'] = True
                 elif 'data-topic_id' in params and self.name_re.search(params['href']): # data-topic_id is needed to avoid conflicts.
-                    self.current_item['desc_link'] = 'https://rutracker.org/forum/'+params['href']
-                    self.current_item['link'] = 'https://rutracker.org/forum/dl.php?t='+params['data-topic_id']
+                    self.current_item['desc_link'] = 'https://rutracker.nl/forum/'+params['href']
+                    self.current_item['link'] = 'https://rutracker.nl/forum/dl.php?t='+params['data-topic_id']
                     self.current_item['name'] = True
                 # If we're on the first page of results, we search for other pages.
                 elif self.first_page:
@@ -269,4 +269,4 @@ if __name__ == "__main__":
     logger.setLevel(logging.INFO)
     engine = rutracker()
     engine.search('lazerhawk')
-    engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927')
+    engine.download_torrent('https://rutracker.nl/forum/dl.php?t=4578927')
