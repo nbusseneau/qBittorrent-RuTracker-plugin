@@ -99,7 +99,7 @@ class rutracker(object):
             response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
             # Only continue if response status is OK.
             if response.getcode() != 200:
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
+                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
             return
@@ -228,7 +228,7 @@ class rutracker(object):
             response = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
             # Only continue if response status is OK.
             if response.getcode() != 200:
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
+                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.search_url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
             return
