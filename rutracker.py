@@ -94,7 +94,6 @@ class rutracker(object):
                 logging.info("Login successful.")
         except (URLError, HTTPError, ValueError) as e:
             logging.error(e)
-            raise e
 
     def initialize_url(self):
         """Try to find a reachable RuTracker mirror."""
@@ -105,9 +104,8 @@ class rutracker(object):
                 return mirror
             except URLError:
                 pass
-        e = ValueError("Unable to resolve any RuTracker mirror.")
-        logging.error(e)
-        raise e
+        logging.error("Unable to resolve any RuTracker mirror.")
+        return ''
     
     def download_torrent(self, url):
         """Download file at url and write it to a file, print the path to the file and the url."""
