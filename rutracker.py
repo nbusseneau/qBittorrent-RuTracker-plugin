@@ -148,7 +148,7 @@ class rutracker(object):
             for key in self.current_item:
                 if self.current_item[key] == True:
                     self.current_item[key] = data
-                    logging.debug((self.tr_counter, key, data))
+                    logging.debug('handle_data: ' + str((self.tr_counter, key, data)))
 
         def handle_starttag(self, tag, attrs):
             """Pass along tag and attributes to dedicated handlers. Discard any tag without handler."""
@@ -169,7 +169,7 @@ class rutracker(object):
                             self.results.append(self.current_item)
                         else:
                             self.tr_counter -= 1 # We decrement by one to keep a good value.
-                        logging.debug(self.current_item)
+                        logging.debug('do_tr: ' + str(self.current_item))
                         self.reset_current()
                     self.tr_counter += 1
             except KeyError:
