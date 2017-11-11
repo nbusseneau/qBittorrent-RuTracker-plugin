@@ -113,10 +113,10 @@ class rutracker(object):
     class Parser(HTMLParser):
         """Implement a simple HTML parser to parse results pages."""
         
-        def __init__(self, download_url, first_page=True):
+        def __init__(self, engine, first_page=True):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
             HTMLParser.__init__(self)
-            self.download_url = download_url
+            self.engine = engine
             self.first_page = first_page
             self.results = []
             self.other_pages = []
@@ -182,8 +182,8 @@ class rutracker(object):
                 if self.cat_re.search(params['href']):
                     self.current_item['cat'] = True
                 elif 'data-topic_id' in params and self.name_re.search(params['href']): # data-topic_id is needed to avoid conflicts.
-                    self.current_item['desc_link'] = self.forum_url + '/' + params['href']
-                    self.current_item['link'] = self.download_url + '?t=' + params['data-topic_id']
+                    self.current_item['desc_link'] = self.engine.forum_url + '/' + params['href']
+                    self.current_item['link'] = self.engine.download_url + '?t=' + params['data-topic_id']
                     self.current_item['name'] = True
                 # If we're on the first page of results, we search for other pages.
                 elif self.first_page:
@@ -223,7 +223,7 @@ class rutracker(object):
         """Search for what starting on specified page. Defaults to first page of results."""
         logging.debug("parse_search({}, {}, {})".format(what, start, first_page))
         # Search.
-        parser = self.Parser(self.download_url, first_page)
+        parser = self.Parser(self, first_page)
         try:
             response = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
             # Only continue if response status is OK.
