@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""rutracker.org search engine plugin for qBittorrent."""
+"""RuTracker search engine plugin for qBittorrent."""
 #VERSION: 1.05
 #AUTHORS: Skymirrh (skymirrh@skymirrh.net)
 
-# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your rutracker.org username and password
+# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your RuTracker username and password
 credentials = {
     'login_username': u'YOUR_USERNAME_HERE',
     'login_password': u'YOUR_PASSWORD_HERE',
@@ -43,15 +43,15 @@ def dict_encode(dict, encoding='cp1251'):
     return encoded_dict
 
 class rutracker(object):
-    """rutracker.org search engine plugin for qBittorrent."""
+    """RuTracker search engine plugin for qBittorrent."""
+    name = 'RuTracker'
     url = 'https://rutracker.org'
-    name = 'rutracker.org'
     login_url = 'https://rutracker.org/forum/login.php'
     download_url = 'https://rutracker.org/forum/dl.php'
     search_url = 'https://rutracker.org/forum/tracker.php'
 
     def __init__(self):
-        """Initialize rutracker search engine, signing in using given credentials."""
+        """Initialize RuTracker search engine, signing in using given credentials."""
         # Initialize cookie handler.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
