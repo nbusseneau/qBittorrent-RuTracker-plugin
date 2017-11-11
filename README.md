@@ -3,7 +3,7 @@ qBittorrent RuTracker plugin
 
 qBittorrent search engine plugin for RuTracker.
 
-Nothing fancy, it follows the [writing plugin guide recommandations](https://github.com/qbittorrent/qBittorrent/wiki/How-to-write-a-search-plugin).
+Nothing fancy, it follows the [writing plugin guide recommandations](https://github.com/qbittorrent/search-plugins/wiki/How-to-write-a-search-plugin).
 
 Installation
 ------------
