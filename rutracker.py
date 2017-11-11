@@ -72,7 +72,7 @@ class rutracker(object):
 
     def __init__(self):
         """Initialize RuTracker search engine, signing in using given credentials."""
-        # Initialize cookie handler.
+        # Initialize various objects.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.url = self.initialize_url()
