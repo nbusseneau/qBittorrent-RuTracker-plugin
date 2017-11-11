@@ -46,9 +46,22 @@ class rutracker(object):
     """RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
     url = 'https://rutracker.org'
-    login_url = 'https://rutracker.org/forum/login.php'
-    download_url = 'https://rutracker.org/forum/dl.php'
-    search_url = 'https://rutracker.org/forum/tracker.php'
+    
+    @property
+    def forum_url(self):
+        return self.url + '/forum'
+        
+    @property
+    def login_url(self):
+        return self.forum_url + '/login.php'
+        
+    @property
+    def download_url(self):
+        return self.forum_url + '/dl.php'
+        
+    @property
+    def search_url(self):
+        return self.forum_url + '/tracker.php'
 
     def __init__(self):
         """Initialize RuTracker search engine, signing in using given credentials."""
