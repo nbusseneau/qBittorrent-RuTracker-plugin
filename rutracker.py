@@ -79,7 +79,8 @@ class rutracker(object):
             if response.getcode() != 200:
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
             # Check if login was successful using cookies.
-            if not 'bb_data' in [cookie.name for cookie in self.cj]:
+            if not 'bb_session' in [cookie.name for cookie in self.cj]:
+                logging.debug(self.cj)
                 raise ValueError("Unable to connect using given credentials.")
             else:
                 logging.info("Login successful.")
