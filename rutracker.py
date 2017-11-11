@@ -94,6 +94,7 @@ class rutracker(object):
                 logging.info("Login successful.")
         except (URLError, HTTPError, ValueError) as e:
             logging.error(e)
+            raise e
 
     def initialize_url(self):
         """Try to find a reachable RuTracker mirror."""
@@ -124,7 +125,7 @@ class rutracker(object):
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
-            return
+            raise e
         # Write it to a file.
         data = response.read()
         file.write(data)
@@ -253,7 +254,7 @@ class rutracker(object):
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.search_url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
-            return
+            raise e
         
         data = response.read().decode('cp1251')
         parser.feed(data)
