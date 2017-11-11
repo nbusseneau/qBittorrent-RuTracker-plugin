@@ -9,6 +9,14 @@ credentials = {
     'login_password': u'YOUR_PASSWORD_HERE',
 }
 
+# List of RuTracker mirrors
+mirrors = [
+    'https://rutracker.org',
+    'https://rutracker.net',
+    'https://rutracker.nl',
+    'https://rutracker.cr',
+]
+
 # Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
 try:
     import cookielib
@@ -45,7 +53,6 @@ def dict_encode(dict, encoding='cp1251'):
 class rutracker(object):
     """RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
-    url = 'https://rutracker.org'
     
     @property
     def forum_url(self):
@@ -68,6 +75,7 @@ class rutracker(object):
         # Initialize cookie handler.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
+        self.url = self.initialize_url()
         self.credentials = credentials
         # Add submit button additional POST param.
         self.credentials['login'] = u'Вход'
@@ -87,6 +95,19 @@ class rutracker(object):
         except (URLError, HTTPError, ValueError) as e:
             logging.error(e)
 
+    def initialize_url(self):
+        """Try to find a reachable RuTracker mirror."""
+        for mirror in mirrors:
+            try:
+                self.opener.open(mirror)
+                logging.info("Found reachable mirror: {}".format(mirror))
+                return mirror
+            except URLError:
+                pass
+        e = ValueError("Unable to resolve any RuTracker mirror.")
+        logging.error(e)
+        raise e
+    
     def download_torrent(self, url):
         """Download file at url and write it to a file, print the path to the file and the url."""
         # Make temp file.
