@@ -53,6 +53,7 @@ def dict_encode(dict, encoding='cp1251'):
 class rutracker(object):
     """RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
+    url = 'https://rutracker.org' # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     
     @property
     def forum_url(self):
@@ -75,7 +76,7 @@ class rutracker(object):
         # Initialize various objects.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
-        self.url = self.initialize_url()
+        self.url = self.initialize_url() # Override url with the actual URL to be used (in case official URL isn't accessible)
         self.credentials = credentials
         # Add submit button additional POST param.
         self.credentials['login'] = u'Вход'
@@ -260,7 +261,7 @@ class rutracker(object):
         
         # PrettyPrint each torrent found.
         for torrent in parser.results:
-            torrent['engine_url'] = self.url
+            torrent['engine_url'] = 'https://rutracker.org' # Kludge, see #15
             if __name__ != "__main__": # This is just to avoid printing when I debug.
                 prettyPrinter(torrent)
 
