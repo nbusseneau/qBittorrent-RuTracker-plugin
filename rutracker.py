@@ -135,11 +135,10 @@ class rutracker(object):
     class Parser(HTMLParser):
         """Implement a simple HTML parser to parse results pages."""
         
-        def __init__(self, engine, first_page=True):
+        def __init__(self, engine):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
             HTMLParser.__init__(self)
             self.engine = engine
-            self.first_page = first_page
             self.results = []
             self.other_pages = []
             self.tr_counter = 0
@@ -241,62 +240,57 @@ class rutracker(object):
             except KeyError:
                 pass
 
-    def parse_search(self, what, start=0, first_page=True):
-        """Search for what starting on specified page. Defaults to first page of results."""
-        logging.debug("parse_search({}, {}, {})".format(what, start, first_page))
-        # Search.
-        parser = self.Parser(self, first_page)
-        try:
-            response = self.opener.open('{}?nm={}&start={}'.format(self.search_url, quote(what), start))
-            # Only continue if response status is OK.
-            if response.getcode() != 200:
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.search_url, response.getcode()), response.info(), None)
-        except (URLError, HTTPError) as e:
-            logging.error(e)
-            raise e
-        
-        data = response.read().decode('cp1251')
-        parser.feed(data)
-        parser.close()
-        
-        # PrettyPrint each torrent found.
-        for torrent in parser.results:
-            torrent['engine_url'] = 'https://rutracker.org' # Kludge, see #15
-            if __name__ != "__main__": # This is just to avoid printing when I debug.
-                prettyPrinter(torrent)
-
-        # If no torrent were found, stop immediately
-        if parser.tr_counter == 0:
-            return
+        def search(self, what, start=0):
+            """Search for what starting on specified page. Defaults to first page of results."""
+            logging.debug("parse_search({}, {})".format(what, start))
             
-        # Else return number of torrents found
-        return (parser.tr_counter, parser.other_pages)
+            # If we're on first page of results, we'll try to find other pages
+            if start == 0:
+                self.first_page = True
+            else:
+                self.first_page = False
+            
+            try:
+                response = self.engine.opener.open('{}?nm={}&start={}'.format(self.engine.search_url, quote(what), start))
+                # Only continue if response status is OK.
+                if response.getcode() != 200:
+                    raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.engine.search_url, response.getcode()), response.info(), None)
+            except (URLError, HTTPError) as e:
+                logging.error(e)
+                raise e
+            
+            # Decode data and feed it to parser
+            data = response.read().decode('cp1251')
+            self.feed(data)
 
     def search(self, what, cat='all'):
         """Search for what on the search engine."""
-        # Search on first page.
+        # Instantiate parser
+        self.parser = self.Parser(self)
+        
+        # Decode search string
         what = unquote(what)
         logging.info("Searching for {}...".format(what))
+        
+        # Search on first page.
         logging.info("Parsing page 1.")
-        results = self.parse_search(what)
-        
-        # If no results, stop
-        if results == None:
-            return
+        self.parser.search(what)
             
-        # Else return current count (total) and all pages found
-        (total, pages) = results
-        logging.info("{} pages of results found.".format(len(pages)+1))
-
-        # Repeat search for each page of results.
-        for start in pages:
-            logging.info("Parsing page {}.".format(int(start)/50+1))
-            results = self.parse_search(what, start, False)
-            if results != None:
-                (counter, _) = results
-                total += counter
+        # If multiple pages of results have been found, repeat search for each page.
+        logging.info("{} pages of results found.".format(len(self.parser.other_pages)+1))
+        for start in self.parser.other_pages:
+            logging.info("Parsing page {}.".format(int(start)//50+1))
+            self.parser.search(what, start)
         
-        logging.info("{} torrents found.".format(total))
+        # PrettyPrint each torrent found, ordered by most seeds
+        self.parser.results.sort(key=lambda torrent:torrent['seeds'], reverse=True)
+        for torrent in self.parser.results:
+            torrent['engine_url'] = 'https://rutracker.org' # Kludge, see #15
+            if __name__ != "__main__": # This is just to avoid printing when I debug.
+                prettyPrinter(torrent)
+        
+        self.parser.close()
+        logging.info("{} torrents found.".format(len(self.parser.results)))
 
 # For testing purposes.
 if __name__ == "__main__":
