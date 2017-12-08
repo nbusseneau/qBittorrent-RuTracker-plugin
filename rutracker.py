@@ -111,7 +111,7 @@ class rutracker(object):
     def download_torrent(self, url):
         """Download file at url and write it to a file, print the path to the file and the url."""
         # Make temp file.
-        file, path = tempfile.mkstemp()
+        file, path = tempfile.mkstemp('.torrent')
         file = os.fdopen(file, "wb")
         # Set up fake POST params, needed to trick the server into sending the file.
         id = re.search(r'dl\.php\?t=(\d+)', url).group(1)
