@@ -156,13 +156,6 @@ class rutracker(object):
                                  'seeds': None,
                                  'leech': None,
                                  'desc_link': None,}
-
-        def close(self):
-            """Override default close() method just to define additional processing."""
-            # We add last item found manually because items are added on new
-            # <tr class="tCenter"> and not on </tr> (can't do it without the attribute).
-            self.results.append(self.current_item)
-            HTMLParser.close(self)
             
         def handle_data(self, data):
             """Retrieve inner text information based on rules defined in do_tag()."""
@@ -177,13 +170,20 @@ class rutracker(object):
                 getattr(self, 'do_{}'.format(tag))(attrs)
             except:
                 pass
+                
+        def handle_endtag(self, tag):
+            """Add last item manually on html end tag."""
+            # We add last item found manually because items are added on new
+            # <tr class="tCenter"> and not on </tr> (can't do it without the attribute).
+            if tag == 'html':
+                self.results.append(self.current_item)
 
         def do_tr(self, attr):
             """<tr class="tCenter"> is the big container for one torrent, so we store current_item and reset it."""
             params = dict(attr)
             try:
                 if 'tCenter' in params['class']:
-                    # Of course we won't store current_item on first <tr class="tCenter"> seen.
+                    # Of course we won't store current_item on first <tr class="tCenter"> seen, since there's no data yet
                     if self.tr_counter != 0:
                         # We only store current_item if torrent is still alive.
                         if self.current_item['seeds'] != None:
