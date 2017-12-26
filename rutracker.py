@@ -17,6 +17,11 @@ mirrors = [
     'https://rutracker.cr',
 ]
 
+# Logging
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.WARNING)
+
 # Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
 try:
     import cookielib
@@ -39,7 +44,6 @@ except ImportError:
 import tempfile
 import os
 import re
-import logging
 
 from novaprinter import prettyPrinter
 
@@ -294,8 +298,6 @@ class rutracker(object):
 
 # For testing purposes.
 if __name__ == "__main__":
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
     engine = rutracker()
     engine.search('lazerhawk')
     engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927')
