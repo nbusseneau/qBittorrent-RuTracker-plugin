@@ -9,7 +9,7 @@ Installation
 ------------
 * [Download the latest release.](https://github.com/Skymirrh/qBittorrent-RuTracker-plugin/releases/latest)
 * Edit `rutracker.py` by replacing `YOUR_USERNAME_HERE` and `YOUR_PASSWORD_HERE` with your RuTracker username and password.
-* Move `rutracker.py` and `rutracker.png` to qBittorrent search engines folder:
+* Move `rutracker.py` and `rutracker.png` to qBittorrent search engines directory:
   * Windows: `%localappdata%\qBittorrent\nova3\engines\`
   * Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
   * OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
@@ -29,10 +29,11 @@ Bug reporting
 * Find your qBittorrent version (see qBittorrent title bar).
 * Find your Python version (run `python --version` from command prompt).
 * Navigate to qBittorrent search engines directory:
-  * Windows: `cd %localappdata%\qBittorrent\nova3\`
-  * Linux: `cd ~/.local/share/data/qBittorrent/nova3/`
-  * OS X: `cd ~/Library/Application Support/qBittorrent/nova3/`
+  * Windows: `%localappdata%\qBittorrent\nova3\engines\`
+  * Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
+  * OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
   * *Note: If you use Python 2 instead of Python 3, replace `nova3` with `nova`.*
-* In the `engines` directory, edit `rutracker.py` and replace `logger.setLevel(logging.WARNING)` with `logger.setLevel(logging.INFO)`.
+* Edit `rutracker.py` and replace `logger.setLevel(logging.WARNING)` with `logger.setLevel(logging.INFO)`.
+* Move to parent directory (`cd ..` or manual browsing to `nova3`).
 * From the `nova3` directory, run `python nova2.py rutracker all archlinux` in a command prompt.
 * [Create a new issue](https://github.com/Skymirrh/qBittorrent-RuTracker-plugin/issues/new) and fill out the form with the information above.
