@@ -179,7 +179,7 @@ class rutracker(object):
             """Add last item manually on html end tag."""
             # We add last item found manually because items are added on new
             # <tr class="tCenter"> and not on </tr> (can't do it without the attribute).
-            if tag == 'html':
+            if tag == 'html' and self.current_item['seeds'] != None:
                 self.results.append(self.current_item)
 
         def do_tr(self, attr):
