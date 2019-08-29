@@ -1,0 +1,4 @@
+import sys
+
+sys.path.append("$path")
+from qbit_rutracker.search import rutracker
