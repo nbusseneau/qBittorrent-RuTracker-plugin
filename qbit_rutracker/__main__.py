@@ -12,9 +12,12 @@ parser.add_argument("--dest", required=True, type=Path, help="Search plugins dir
 
 args = parser.parse_args()
 
-ini_str = pkg_resources.resource_string(__name__, "rutracker.ini")
-print("Creating ini file in", args.ini)
-args.ini.write_bytes(ini_str)
+if not args.ini.exists():
+    ini_str = pkg_resources.resource_string(__name__, "rutracker.ini")
+    print("Creating ini file in", args.ini)
+    args.ini.write_bytes(ini_str)
+else:
+    print("Config already exists, skipping.")
 
 png = pkg_resources.resource_string(__name__, "rutracker.png")
 plugin_raw = pkg_resources.resource_string(__name__, "rutracker.py.txt").decode()

@@ -1,9 +1,11 @@
+from pathlib import Path
 import sys
 
 sys.path.append("$import_path")
+# directory with the nova3, for manual checks
+sys.path.append(str(Path(__file__).absolute().parent.parent))
 from qbit_rutracker.search import rutracker as basert
 
 class rutracker(basert):
     def __init__(self):
         super().__init__("$ini")
-        print("Rutracker plugin loaded.")

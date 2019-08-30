@@ -2,6 +2,7 @@ from enum import Enum
 import logging
 import re
 import typing as ty
+import time
 
 import humanfriendly
 import requests
@@ -110,8 +111,8 @@ class Connection(requests.Session):
     def search(
         self, text: str, start=0, order_by: OrderBy = None, sort: Sort = None
     ) -> ty.Iterable[dict]:
-        text = self.search_request(text=text, start=start, order_by=order_by, sort=sort)
-        page = ResultsPage(text, host=self.host)
+        response_text = self.search_request(text=text, start=start, order_by=order_by, sort=sort)
+        page = ResultsPage(response_text, host=self.host)
         user = page.current_user()
         if user != self.username:
             log.warning("Current user is %s - what?", user)
@@ -122,9 +123,12 @@ class Connection(requests.Session):
             if not page.has_next():
                 break
             start += len(page)
-            page = self.search_request(
+            # just to not load rutracker too much
+            time.sleep(0.4)
+            response_text = self.search_request(
                 text=text, start=start, order_by=order_by, sort=sort
             )
+            page = ResultsPage(response_text)
 
 
 class ResultsPage:
@@ -173,6 +177,12 @@ class ResultsPage:
             elem["size"] = humanfriendly.parse_size(size_col.get("data-ts_text"), binary=True)
             # size column also contains download link
             elem["link"] = self.host + "/forum/" + size_col.a.get("href")
-            elem["seeds"] = int(row.find("b", {"class": "seedmed"}).string)
+            seeds = row.find("b", {"class": "seedmed"})
+            elem["seeds"] = int(seeds.string) if seeds is not None else 0
             elem["leech"] = int(row.find("td", {"class": "leechmed"}).string)
             yield elem
+
+    def __len__(self):
+        if not self.has_topics():
+            return 0
+        return sum(1 for _ in self.table.find("tbody").find_all("tr"))
