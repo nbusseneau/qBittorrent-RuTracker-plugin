@@ -23,7 +23,7 @@ plugin = string.Template(plugin_raw)
 import_path = Path(__file__).parent.parent
 print("Using import path:", import_path)
 
-plugin = plugin.substitute(ini=args.ini, import_path=import_path)
+plugin = plugin.substitute(ini=args.ini.absolute(), import_path=import_path)
 
 print("Writing plugin link to the", args.dest)
 args.dest.joinpath("rutracker.png").write_bytes(png)
