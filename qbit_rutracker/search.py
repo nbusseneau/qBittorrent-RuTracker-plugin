@@ -21,7 +21,7 @@ class rutracker:
         self.config = config["rutracker"]
         self.conn = self.connect()
         self.log = self.get_logger()
-        self.log.warning("Rutracker plugin loaded.")
+        self.log.info("Rutracker plugin loaded.")
 
     def get_logger(self):
         log = logging.getLogger(__name__)
