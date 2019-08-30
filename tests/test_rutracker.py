@@ -19,8 +19,7 @@ def test_connection(pytestconfig):
 def test_sample_page():
     html = samples_dir.joinpath("sample.html").read_text()
     page = ResultsPage(html)
-    soup = page.soup
-    table = soup.find("table", **{"class": "forumline"})
+    table = page.soup.find("table", **{"class": "forumline"})
     assert table
     assert page.has_topics()
     assert page.current_user() == "username"
@@ -35,3 +34,10 @@ def test_sample_page():
     assert elem["link"] == "/forum/dl.php?t=4948966"
     assert elem["seeds"] == 259
     assert elem["leech"] == 9
+
+@mark.unit
+def test_empty_page():
+    html = samples_dir.joinpath("empty.html").read_text()
+    page = ResultsPage(html)
+    assert not page.has_topics()
+    assert list(page) == []

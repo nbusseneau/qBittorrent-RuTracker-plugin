@@ -158,6 +158,8 @@ class ResultsPage:
         return int(current.string) < int(total.string)
 
     def __iter__(self):
+        if not self.has_topics():
+            return
         for row in self.table.find("tbody").find_all("tr"):
             elem = {
                 k: None
