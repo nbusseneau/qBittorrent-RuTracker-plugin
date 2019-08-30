@@ -1,4 +1,9 @@
 import sys
 
-sys.path.append("$path")
-from qbit_rutracker.search import rutracker
+sys.path.append("$import_path")
+from qbit_rutracker.search import rutracker as basert
+
+class rutracker(basert):
+    def __init__(self):
+        super().__init__("$ini")
+        print("Rutracker plugin loaded.")
