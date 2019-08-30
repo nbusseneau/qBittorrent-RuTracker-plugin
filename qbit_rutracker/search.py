@@ -1,5 +1,6 @@
 import configparser
 import logging
+import urllib.parse
 
 import humanize
 from novaprinter import prettyPrinter
@@ -44,6 +45,9 @@ class rutracker:
 
     def search(self, what, cat="all"):
         try:
+            # idk why but qbittorrent sends already url-encoded string
+            # so we have to unquote it in order to pass to requests
+            what = urllib.parse.unquote(what)
             for torrent in self.conn.search(what):
                 self.log.debug("Processing torrent %s", torrent["name"])
                 # According to documentation,

@@ -114,7 +114,7 @@ class Connection(requests.Session):
         order_by = order_by or self.order_by
         sort = sort or self.sort
         params = {"nm": text, "start": start}
-        data = dict(f=[-1], o=order_by.value, s=sort.value, nm=text.encode("cp1251"))
+        data = dict(f=[-1], o=order_by.value, s=sort.value, nm=text)
         response = self.sendreq("post", "/forum/tracker.php", params=params, data=data)
         if not response.ok:
             log.debug("Response body: \n%s", response.text)
