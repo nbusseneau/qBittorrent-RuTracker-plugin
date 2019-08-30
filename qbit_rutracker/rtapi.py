@@ -107,14 +107,14 @@ class Connection(requests.Session):
         torrent_id = self.search_re.search(url).group(1)
         post_params = {"t": torrent_id}
         dict_encode(post_params)
-        file, path = tempfile.mkstemp(".torrent")
+        path = tempfile.mktemp(".torrent")
         response = self.sendreq("post", url, data=post_params, stream=True)
-        log.info("Saving to file %s", file)
-        with open(file, "wb") as fd:
+        log.info("Saving to file %s", path)
+        with open(path, "wb") as fd:
             torrent = response.raw.read()
             fd.write(torrent)
             # doesn't work: object of type '_io.BufferedWriter' has no len()
-            # response.raw.readinto(fd)
+            # response.raw.readinto(file)
         if response.status_code != 200:
             log.warning(response.text)
             raise ValueError(f"Download response code {response.status_code}")
