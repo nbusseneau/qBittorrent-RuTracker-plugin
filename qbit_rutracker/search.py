@@ -8,6 +8,7 @@ from .rtapi import Connection, Sort, OrderBy
 
 
 class rutracker:
+    """ qbittorrent search API interface implementation. """
     name = "RuTracker"
     # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent
     # will fail to register the engine, see #15
@@ -49,3 +50,6 @@ class rutracker:
         except:
             self.log.exception("Got error on search")
 
+
+    def download_torrent(self, url):
+        return self.conn.download_torrent(url=url)

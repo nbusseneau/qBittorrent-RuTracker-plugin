@@ -1,6 +1,7 @@
 from enum import Enum
 import logging
 import re
+import tempfile
 import typing as ty
 import time
 
@@ -42,6 +43,7 @@ class Connection(requests.Session):
         " Chrome/76.0.3809.110 Safari/537.36 Vivaldi/2.7.1628.30"
     )
     hosts = ["rutracker.org", "rutracker.net", "rutracker.nl", "rutracker.cr"]
+    search_re = re.compile(r"dl\.php\?t=(\d+)")
 
     def __init__(self, login, password, mask_useragent=False):
         super().__init__()
@@ -65,7 +67,7 @@ class Connection(requests.Session):
         raise requests.ConnectionError("Failed to connect to any of the mirrors.")
 
     def sendreq(
-        self, method: str, url: str, params=None, data=None
+        self, method: str, url: str, params=None, data=None, **kwargs
     ) -> requests.Response:
         """ Sends new HTTP request to the current RuTracker endpoint. """
         return self.request(
@@ -75,6 +77,7 @@ class Connection(requests.Session):
             data=data,
             headers={"User-Agent": self.user_agent} if self.mask_useragent else None,
             allow_redirects=False,
+            **kwargs,
         )
 
     def login(self, login: str, password: str):
@@ -95,6 +98,17 @@ class Connection(requests.Session):
         for name, value in raw_items:
             self.cookies.set(name, value)
 
+    def download_torrent(self, url):
+        # Set up fake POST params, needed to trick the server into sending the file.
+        torrent_id = self.search_re.search(url).group(1)
+        post_params = {"t": torrent_id}
+        dict_encode(post_params)
+        file, path = tempfile.mkstemp(".torrent")
+        response = self.sendreq("post", url, data=post_params, stream=True)
+        with open(file, "wb") as fd:
+            response.raw.readinto(fd)
+        print(path, url)
+
     def search_request(
         self, text: str, start=0, order_by: OrderBy = None, sort: Sort = None
     ) -> str:
@@ -111,7 +125,9 @@ class Connection(requests.Session):
     def search(
         self, text: str, start=0, order_by: OrderBy = None, sort: Sort = None
     ) -> ty.Iterable[dict]:
-        response_text = self.search_request(text=text, start=start, order_by=order_by, sort=sort)
+        response_text = self.search_request(
+            text=text, start=start, order_by=order_by, sort=sort
+        )
         page = ResultsPage(response_text, host=self.host)
         user = page.current_user()
         if user != self.username:
@@ -174,7 +190,9 @@ class ResultsPage:
             elem["name"] = f"[{category}] " + title.text
             elem["desc_link"] = self.host + "/forum/" + title.get("href")
             size_col = row.find("td", **{"class": "tor-size"})
-            elem["size"] = humanfriendly.parse_size(size_col.get("data-ts_text"), binary=True)
+            elem["size"] = humanfriendly.parse_size(
+                size_col.get("data-ts_text"), binary=True
+            )
             # size column also contains download link
             elem["link"] = self.host + "/forum/" + size_col.a.get("href")
             seeds = row.find("b", {"class": "seedmed"})
