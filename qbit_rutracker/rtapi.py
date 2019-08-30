@@ -106,6 +106,9 @@ class Connection(requests.Session):
         response = self.sendreq("post", url, data=post_params, stream=True)
         with open(file, "wb") as fd:
             response.raw.readinto(fd)
+        if response.status_code != 200:
+            log.warning(response.text)
+            raise ValueError(f"Download response code {response.status_code}")
         print(path, url)
 
     def search_request(
@@ -190,6 +193,9 @@ class ResultsPage:
             elem["desc_link"] = self.host + "/forum/" + title.get("href")
             size_col = row.find("td", **{"class": "tor-size"})
             elem["size"] = int(size_col.get("data-ts_text"))
+            if size_col.a is None:
+                # torrent topic has been swallowed (поглощён), nothing to do here
+                continue
             # size column also contains download link
             elem["link"] = self.host + "/forum/" + size_col.a.get("href")
             seeds = row.find("b", {"class": "seedmed"})

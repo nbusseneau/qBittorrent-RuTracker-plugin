@@ -62,4 +62,8 @@ class rutracker:
 
 
     def download_torrent(self, url):
-        return self.conn.download_torrent(url=url)
+        try:
+            self.conn.download_torrent(url=url)
+            self.info("Torrent downloaded.")
+        except:
+            self.log.exception("Failed to download torrent %s", url)
