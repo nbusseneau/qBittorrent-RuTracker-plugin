@@ -1,6 +1,7 @@
 import configparser
 import logging
 
+import humanize
 from novaprinter import prettyPrinter
 
 from . import rtapi
@@ -45,6 +46,11 @@ class rutracker:
         try:
             for torrent in self.conn.search(what):
                 self.log.debug("Processing torrent %s", torrent["name"])
+                # According to documentation,
+                # "size => A string corresponding to the torrent size
+                # (i.e: "6 MB" or "200 KB" or "1.2 GB"...)"
+                # so we have to humanize size
+                torrent["size"] = humanize.naturalsize(torrent["size"])
                 torrent["engine_url"] = "https://rutracker.org"  # Kludge, see #15
                 prettyPrinter(torrent)
         except:

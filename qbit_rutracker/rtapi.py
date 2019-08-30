@@ -5,7 +5,6 @@ import tempfile
 import typing as ty
 import time
 
-import humanfriendly
 import requests
 from bs4 import BeautifulSoup, element
 
@@ -190,9 +189,7 @@ class ResultsPage:
             elem["name"] = f"[{category}] " + title.text
             elem["desc_link"] = self.host + "/forum/" + title.get("href")
             size_col = row.find("td", **{"class": "tor-size"})
-            elem["size"] = humanfriendly.parse_size(
-                size_col.get("data-ts_text"), binary=True
-            )
+            elem["size"] = int(size_col.get("data-ts_text"))
             # size column also contains download link
             elem["link"] = self.host + "/forum/" + size_col.a.get("href")
             seeds = row.find("b", {"class": "seedmed"})
