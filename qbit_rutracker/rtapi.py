@@ -44,12 +44,17 @@ class Connection(requests.Session):
     hosts = ["rutracker.org", "rutracker.net", "rutracker.nl", "rutracker.cr"]
     search_re = re.compile(r"dl\.php\?t=(\d+)")
 
-    def __init__(self, login, password, mask_useragent=False):
+    def __init__(self, login=None, password=None, cookies=None, mask_useragent=False):
         super().__init__()
         self.host = self._find_host()
         self.mask_useragent = mask_useragent
         self.username = login
-        self.login(login=login, password=password)
+        if cookies is not None:
+            self.load_cookies(cookies)
+        elif login is None or password is None:
+            raise ValueError("Provide login/password or cookies list.")
+        else:
+            self.login(login=login, password=password)
 
         self.order_by = OrderBy.Seeds
         self.sort = Sort.Descending
@@ -97,19 +102,23 @@ class Connection(requests.Session):
         for name, value in raw_items:
             self.cookies.set(name, value)
 
-    def download_torrent(self, url):
+    def download_torrent(self, url) -> str:
         # Set up fake POST params, needed to trick the server into sending the file.
         torrent_id = self.search_re.search(url).group(1)
         post_params = {"t": torrent_id}
         dict_encode(post_params)
         file, path = tempfile.mkstemp(".torrent")
         response = self.sendreq("post", url, data=post_params, stream=True)
+        log.info("Saving to file %s", file)
         with open(file, "wb") as fd:
-            response.raw.readinto(fd)
+            torrent = response.raw.read()
+            fd.write(torrent)
+            # doesn't work: object of type '_io.BufferedWriter' has no len()
+            # response.raw.readinto(fd)
         if response.status_code != 200:
             log.warning(response.text)
             raise ValueError(f"Download response code {response.status_code}")
-        print(path, url)
+        return path + " " + url
 
     def search_request(
         self, text: str, start=0, order_by: OrderBy = None, sort: Sort = None

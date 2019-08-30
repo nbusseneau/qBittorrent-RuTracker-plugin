@@ -30,7 +30,7 @@ class rutracker:
         rtapi.log.setLevel(logging.INFO)
         filename = self.config.get("error_log")
         if filename:
-            logging.basicConfig(filename=filename, level=logging.WARNING)
+            logging.basicConfig(filename=filename, level=logging.INFO)
         return log
 
     def connect(self) -> Connection:
@@ -61,9 +61,10 @@ class rutracker:
             self.log.exception("Got error on search")
 
 
-    def download_torrent(self, url):
+    def download_torrent(self, info):
         try:
-            self.conn.download_torrent(url=url)
-            self.info("Torrent downloaded.")
+            pth = self.conn.download_torrent(url=info)
+            print(pth)
+            self.log.info("Torrent downloaded.")
         except:
-            self.log.exception("Failed to download torrent %s", url)
+            self.log.exception("Failed to download torrent %s", info)
