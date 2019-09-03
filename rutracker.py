@@ -141,7 +141,13 @@ class rutracker(object):
         
         def __init__(self, engine):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
-            HTMLParser.__init__(self)
+            # In Python 3 convert_charrefs is set to True by default: handle_data() receives HTML entities as regular data, handle_entityref() does nothing.
+            # In Python 2 there is no convert_charrefs: HTML entities are always processed by handle_entityref().
+            # Thus, we make Python 3 work like Python 2 in order to standardize HTML entities handling.
+            try:
+                HTMLParser.__init__(self, convert_charrefs=False)
+            except:
+                HTMLParser.__init__(self)
             self.engine = engine
             self.results = []
             self.other_pages = []
@@ -149,6 +155,7 @@ class rutracker(object):
             self.cat_re = re.compile(r'tracker\.php\?f=\d+')
             self.name_re = re.compile(r'viewtopic\.php\?t=\d+')
             self.pages_re = re.compile(r'tracker\.php\?.*?start=(\d+)')
+            self.size_re = re.compile(r'[^.0-9a-zA-Z]+')
             self.reset_current()
 
         def reset_current(self):
@@ -160,13 +167,25 @@ class rutracker(object):
                                  'seeds': None,
                                  'leech': None,
                                  'desc_link': None,}
-            
+
         def handle_data(self, data):
             """Retrieve inner text information based on rules defined in do_tag()."""
             for key in self.current_item:
                 if self.current_item[key] == True:
-                    self.current_item[key] = data
+                    if key == 'size':
+                        self.current_item['size'] = self.size_re.sub(r'', data)
+                    elif key == 'size_extension':
+                        self.current_item['size'] += data
+                    else:
+                        self.current_item[key] = data
                     logging.debug('handle_data: ' + str((self.tr_counter, key, data)))
+            if 'size_extension' in self.current_item:
+                del self.current_item['size_extension']
+
+        def handle_entityref(self, entity):
+            """When encountering a &nbsp; after setting size, this means next handle_data() will received size extension (e.g. 'MB', 'GB')"""
+            if entity == "nbsp" and self.current_item['size'] is not None:
+                self.current_item['size_extension'] = True
 
         def handle_starttag(self, tag, attrs):
             """Pass along tag and attributes to dedicated handlers. Discard any tag without handler."""
@@ -201,7 +220,7 @@ class rutracker(object):
                 pass
 
         def do_a(self, attr):
-            """<a> tags can specify torrent link in "href" or category or name in inner text. Also used to retrieve further results pages."""
+            """<a> tags can specify torrent link in "href" or category or name or size in inner text. Also used to retrieve further results pages."""
             params = dict(attr)
             try:
                 if self.cat_re.search(params['href']):
@@ -210,6 +229,8 @@ class rutracker(object):
                     self.current_item['desc_link'] = self.engine.forum_url + '/' + params['href']
                     self.current_item['link'] = self.engine.download_url + '?t=' + params['data-topic_id']
                     self.current_item['name'] = True
+                elif self.current_item['size'] == False:
+                    self.current_item['size'] = True
                 # If we're on the first page of results, we search for other pages.
                 elif self.first_page:
                     pages = self.pages_re.search(params['href'])
@@ -220,7 +241,7 @@ class rutracker(object):
                 pass
 
         def do_td(self, attr):
-            """<td> tags give us number of leechers in inner text and can signal torrent size in next <u> tag."""
+            """<td> tags give us number of leechers in inner text and can signal torrent size in next <a> tag."""
             params = dict(attr)
             try:
                 if 'tor-size' in params['class']:
@@ -229,11 +250,6 @@ class rutracker(object):
                     self.current_item['leech'] = True
             except KeyError:
                 pass
-
-        def do_u(self, attr):
-            """<u> tags give us torrent size in inner text."""
-            if self.current_item['size'] == False:
-                self.current_item['size'] = True
 
         def do_b(self, attr):
             """<b class="seedmed"> give us number of seeders in inner text."""
