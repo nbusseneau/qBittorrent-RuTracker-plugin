@@ -164,6 +164,7 @@ class rutracker(object):
                                  'name': None,
                                  'link': None,
                                  'size': None,
+                                 'size_extension': None,
                                  'seeds': None,
                                  'leech': None,
                                  'desc_link': None,}
@@ -173,18 +174,24 @@ class rutracker(object):
             for key in self.current_item:
                 if self.current_item[key] == True:
                     if key == 'size':
-                        self.current_item['size'] = self.size_re.sub(r'', data)
+                        try:
+                            value = float(data)
+                            self.current_item['size'] = self.size_re.sub(r'', data)
+                            self.current_item['size_extension'] = 'waitForEntityRef' # Flag size_extension as parsable in subsequents entityref checks
+                        except ValueError:
+                            pass # Ignore float parsing errors -- this just means we'll get the data later from <a> tag
                     elif key == 'size_extension':
                         self.current_item['size'] += data
+                        self.current_item['size_extension'] = 'parsed'
                     else:
                         self.current_item[key] = data
                     logging.debug('handle_data: ' + str((self.tr_counter, key, data)))
-            if 'size_extension' in self.current_item:
+            if 'size_extension' in self.current_item and self.current_item['size_extension'] == 'parsed':
                 del self.current_item['size_extension']
 
         def handle_entityref(self, entity):
-            """When encountering a &nbsp; after setting size, this means next handle_data() will received size extension (e.g. 'MB', 'GB')"""
-            if entity == "nbsp" and self.current_item['size'] is not None:
+            """When encountering a &nbsp; right after setting size, next handle_data() will receive size extension (e.g. 'MB', 'GB')"""
+            if entity == "nbsp" and 'size_extension' in self.current_item and self.current_item['size_extension'] == 'waitForEntityRef':
                 self.current_item['size_extension'] = True
 
         def handle_starttag(self, tag, attrs):
@@ -220,7 +227,7 @@ class rutracker(object):
                 pass
 
         def do_a(self, attr):
-            """<a> tags can specify torrent link in "href" or category or name or size in inner text. Also used to retrieve further results pages."""
+            """<a> tags can specify torrent link in "href" or category or name. Also used to retrieve further results pages."""
             params = dict(attr)
             try:
                 if self.cat_re.search(params['href']):
@@ -229,8 +236,6 @@ class rutracker(object):
                     self.current_item['desc_link'] = self.engine.forum_url + '/' + params['href']
                     self.current_item['link'] = self.engine.download_url + '?t=' + params['data-topic_id']
                     self.current_item['name'] = True
-                elif self.current_item['size'] == False:
-                    self.current_item['size'] = True
                 # If we're on the first page of results, we search for other pages.
                 elif self.first_page:
                     pages = self.pages_re.search(params['href'])
@@ -241,11 +246,11 @@ class rutracker(object):
                 pass
 
         def do_td(self, attr):
-            """<td> tags give us number of leechers in inner text and can signal torrent size in next <a> tag."""
+            """<td> tags give us number of leechers in inner text and can signal torrent size in child <a> tag OR directly in inner text."""
             params = dict(attr)
             try:
                 if 'tor-size' in params['class']:
-                    self.current_item['size'] = False
+                    self.current_item['size'] = True
                 elif 'leechmed' in params['class']:
                     self.current_item['leech'] = True
             except KeyError:
