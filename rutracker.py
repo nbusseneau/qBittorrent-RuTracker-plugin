@@ -181,7 +181,7 @@ class rutracker(object):
                         except ValueError:
                             pass # Ignore float parsing errors -- this just means we'll get the data later from <a> tag
                     elif key == 'size_extension':
-                        self.current_item['size'] += data
+                        self.current_item['size'] += data.strip()
                         self.current_item['size_extension'] = 'parsed'
                     else:
                         self.current_item[key] = data
