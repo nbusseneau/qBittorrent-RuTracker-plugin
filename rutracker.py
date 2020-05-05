@@ -14,7 +14,6 @@ mirrors = [
     'https://rutracker.org',
     'https://rutracker.net',
     'https://rutracker.nl',
-    'https://rutracker.cr',
 ]
 
 # Logging
