@@ -185,9 +185,10 @@ class rutracker(object):
                         self.current_item['size_extension'] = 'parsed'
                     else:
                         self.current_item[key] = data
-                    logging.debug('handle_data: ' + str((self.tr_counter, key, data)))
+                    logging.debug('handle_data: ' + str((self.tr_counter, key, data, self.current_item[key])))
             if 'size_extension' in self.current_item and self.current_item['size_extension'] == 'parsed':
                 del self.current_item['size_extension']
+                logging.debug('handle_data: ' + str((self.tr_counter, self.current_item['size'])))
 
         def handle_entityref(self, entity):
             """When encountering a &nbsp; right after setting size, next handle_data() will receive size extension (e.g. 'MB', 'GB')"""
