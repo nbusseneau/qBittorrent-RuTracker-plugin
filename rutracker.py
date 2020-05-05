@@ -295,7 +295,7 @@ class rutracker(object):
         # Search on first page.
         logging.info("Parsing page 1.")
         self.parser.search(what)
-            
+        
         # If multiple pages of results have been found, repeat search for each page.
         logging.info("{} pages of results found.".format(len(self.parser.other_pages)+1))
         for start in self.parser.other_pages:
