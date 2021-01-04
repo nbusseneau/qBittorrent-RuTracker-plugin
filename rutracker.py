@@ -101,15 +101,17 @@ class rutracker(object):
 
     def initialize_url(self):
         """Try to find a reachable RuTracker mirror."""
+        errors = []
         for mirror in mirrors:
             try:
                 self.opener.open(mirror)
                 logging.info("Found reachable mirror: {}".format(mirror))
                 return mirror
-            except URLError:
-                pass
-        logging.error("Unable to resolve any RuTracker mirror.")
-        return ''
+            except URLError as e:
+                logging.warning("Could not resolve mirror: {}".format(mirror))
+                errors.append(e)
+        logging.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
+        raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
     
     def download_torrent(self, url):
         """Download file at url and write it to a file, print the path to the file and the url."""
