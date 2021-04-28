@@ -134,7 +134,7 @@ class rutracker(object):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
             HTMLParser.__init__(self, convert_charrefs=False)
             self.engine = engine
-            self.results = []
+            self.torrent_count = 0
             self.other_pages = []
             self.tr_counter = 0
             self.cat_re = re.compile(r'tracker\.php\?f=\d+')
@@ -145,14 +145,17 @@ class rutracker(object):
 
         def reset_current(self):
             """Reset current_item (i.e. torrent) to default values."""
-            self.current_item = {'cat': None,
-                                 'name': None,
-                                 'link': None,
-                                 'size': None,
-                                 'size_extension': None,
-                                 'seeds': None,
-                                 'leech': None,
-                                 'desc_link': None,}
+            self.current_item = {
+                'cat': None,
+                'name': None,
+                'link': None,
+                'size': None,
+                'size_extension': None,
+                'seeds': None,
+                'leech': None,
+                'desc_link': None,
+                'engine_url': 'https://rutracker.org', # Kludge, see #15
+            }
 
         def handle_data(self, data):
             """Retrieve inner text information based on rules defined in do_tag()."""
@@ -192,7 +195,9 @@ class rutracker(object):
             # We add last item found manually because items are added on new
             # <tr class="tCenter"> and not on </tr> (can't do it without the attribute).
             if tag == 'html' and self.current_item['seeds'] != None:
-                self.results.append(self.current_item)
+                if __name__ != "__main__": # avoid printing while developing
+                    prettyPrinter(self.current_item)
+                self.torrent_count += 1
 
         def do_tr(self, attr):
             """<tr class="tCenter"> is the big container for one torrent, so we store current_item and reset it."""
@@ -203,7 +208,9 @@ class rutracker(object):
                     if self.tr_counter != 0:
                         # We only store current_item if torrent is still alive.
                         if self.current_item['seeds'] != None:
-                            self.results.append(self.current_item)
+                            if __name__ != "__main__": # avoid printing while developing
+                                prettyPrinter(self.current_item)
+                            self.torrent_count += 1
                         else:
                             self.tr_counter -= 1 # We decrement by one to keep a good value.
                         logging.debug('do_tr: ' + str(self.current_item))
@@ -293,15 +300,8 @@ class rutracker(object):
             logging.info("Parsing page {}.".format(int(start)//50+1))
             self.parser.search(what, start)
         
-        # PrettyPrint each torrent found, ordered by most seeds
-        self.parser.results.sort(key=lambda torrent:torrent['seeds'], reverse=True)
-        for torrent in self.parser.results:
-            torrent['engine_url'] = 'https://rutracker.org' # Kludge, see #15
-            if __name__ != "__main__": # This is just to avoid printing when I debug.
-                prettyPrinter(torrent)
-        
         self.parser.close()
-        logging.info("{} torrents found.".format(len(self.parser.results)))
+        logging.info("{} torrents found.".format(self.parser.torrent_count))
 
 
 # For testing purposes.
