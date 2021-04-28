@@ -16,35 +16,24 @@ mirrors = [
     'https://rutracker.nl',
 ]
 
-# Logging
+
+from html.parser import HTMLParser
+import http.cookiejar as cookielib
 import logging
+import os
+import re
+import tempfile
+from urllib.error import URLError, HTTPError
+from urllib.parse import urlencode, quote, unquote
+from urllib.request import build_opener, HTTPCookieProcessor
+
+from novaprinter import prettyPrinter
+
+
+# Setup logging
 logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
-# Try blocks are used to circumvent Python2/3 modules discrepancies and use a single script for both versions.
-try:
-    import cookielib
-except ImportError:
-    import http.cookiejar as cookielib
-    
-try:    
-    from urllib import urlencode, quote, unquote
-    from urllib2 import build_opener, HTTPCookieProcessor, URLError, HTTPError
-except ImportError:
-    from urllib.parse import urlencode, quote, unquote
-    from urllib.request import build_opener, HTTPCookieProcessor
-    from urllib.error import URLError, HTTPError
-
-try:
-    from HTMLParser import HTMLParser
-except ImportError:
-    from html.parser import HTMLParser
-    
-import tempfile
-import os
-import re
-
-from novaprinter import prettyPrinter
 
 def dict_encode(dict, encoding='cp1251'):
     """Encode dict values to encoding (default: cp1251)."""
@@ -52,6 +41,7 @@ def dict_encode(dict, encoding='cp1251'):
     for key in dict:
         encoded_dict[key] = dict[key].encode(encoding)
     return encoded_dict
+
 
 class rutracker(object):
     """RuTracker search engine plugin for qBittorrent."""
@@ -142,13 +132,7 @@ class rutracker(object):
         
         def __init__(self, engine):
             """Initialize the parser with url and tell him if he's on the first page of results or not."""
-            # In Python 3 convert_charrefs is set to True by default: handle_data() receives HTML entities as regular data, handle_entityref() does nothing.
-            # In Python 2 there is no convert_charrefs: HTML entities are always processed by handle_entityref().
-            # Thus, we make Python 3 work like Python 2 in order to standardize HTML entities handling.
-            try:
-                HTMLParser.__init__(self, convert_charrefs=False)
-            except:
-                HTMLParser.__init__(self)
+            HTMLParser.__init__(self, convert_charrefs=False)
             self.engine = engine
             self.results = []
             self.other_pages = []
@@ -318,6 +302,7 @@ class rutracker(object):
         
         self.parser.close()
         logging.info("{} torrents found.".format(len(self.parser.results)))
+
 
 # For testing purposes.
 if __name__ == "__main__":

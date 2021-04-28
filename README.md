@@ -13,7 +13,6 @@ Installation
   * Windows: `%localappdata%\qBittorrent\nova3\engines\`
   * Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
   * OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
-  * *Note: If you use Python 2 instead of Python 3, replace `nova3` with `nova`.*
 * RuTracker search engine should now be available in qBittorrent.
 
 Troubleshooting
@@ -32,7 +31,6 @@ Bug reporting
   * Windows: `%localappdata%\qBittorrent\nova3\engines\`
   * Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
   * OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
-  * *Note: If you use Python 2 instead of Python 3, replace `nova3` with `nova`.*
 * Edit `rutracker.py` and replace `logger.setLevel(logging.WARNING)` with `logger.setLevel(logging.INFO)`.
 * Move to parent directory (`cd ..` or manual browsing to `nova3`).
 * From the `nova3` directory, run `python nova2.py rutracker all archlinux` in a command prompt.
