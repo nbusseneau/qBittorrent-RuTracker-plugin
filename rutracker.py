@@ -4,13 +4,13 @@
 #AUTHORS: Skymirrh (skymirrh@gmail.com)
 
 # Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your RuTracker username and password
-credentials = {
+CREDENTIALS = {
     'login_username': u'YOUR_USERNAME_HERE',
     'login_password': u'YOUR_PASSWORD_HERE',
 }
 
 # List of RuTracker mirrors
-mirrors = [
+MIRRORS = [
     'https://rutracker.org',
     'https://rutracker.net',
     'https://rutracker.nl',
@@ -25,7 +25,7 @@ import re
 from tempfile import NamedTemporaryFile
 from typing import Optional
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlencode, quote, unquote
+from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
 from urllib.request import build_opener, HTTPCookieProcessor
 
 from novaprinter import prettyPrinter
@@ -36,21 +36,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.WARNING)
 
 
-def dict_encode(dict, encoding: str='cp1251') -> dict:
-    """Encode dict values to encoding (default: cp1251)."""
-    encoded_dict = {}
-    for key in dict:
-        encoded_dict[key] = dict[key].encode(encoding)
-    return encoded_dict
-
-
 class rutracker(object):
     """RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
     url = 'https://rutracker.org' # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
+    encoding = 'cp1251'
 
-    re_search_queries = re.compile(r'<a.+?href="tracker\.php?(.*?start=\d+)"')
-    re_threads= re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
+    re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
+    re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
     re_torrent_data = re.compile(
         r'data-topic_id="(?P<id>\d+?)".*?>(?P<title>.+?)<'
         r'.+?'
@@ -72,49 +65,40 @@ class rutracker(object):
     def search_url(self, query: str) -> str:
         return self.forum_url + 'tracker.php?' + query
 
-    def download_url(self, torrent_id: int) -> str:
-        return self.forum_url + 'dl.php?t=' + torrent_id
+    def download_url(self, query: str) -> str:
+        return self.forum_url + 'dl.php?' + query
 
-    def topic_url(self, torrent_id: int) -> str:
-        return self.forum_url + 'viewtopic.php?t=' + torrent_id
+    def topic_url(self, query: str) -> str:
+        return self.forum_url + 'viewtopic.php?' + query
 
     def __init__(self):
         """[Called by qBittorrent from `nova2.py` and `nova2dl.py`] Initialize RuTracker search engine, signing in using given credentials."""
-        # Initialize various objects.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
-        self.url = self.__initialize_url() # Override url with the actual URL to be used (in case official URL isn't accessible)
-        self.credentials = credentials
-        self.credentials['login'] = u'Вход' # Add submit button additional POST param
 
-        # Send POST information and sign in
-        try:
-            logging.info("Trying to connect using given credentials.")
-            response = self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
-            if response.getcode() != 200: # Check if response status is OK
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
-            # Check if login was successful using cookies
-            if not 'bb_session' in [cookie.name for cookie in self.cj]:
-                logging.debug(self.cj)
-                raise ValueError("Unable to connect using given credentials.")
-            else:
-                logging.info("Login successful.")
-        except (URLError, HTTPError, ValueError) as e:
+        # If mirror list was updated, check for a reachable mirror immediately
+        # Otherwise this will be lazily checked on first login attempt
+        if self.url != MIRRORS[0]:
+            self.url = self.__check_mirrors()
+
+        self.__login()
+
+    def __login(self) -> None:
+        """Set up credentials and try to sign in."""
+        self.credentials = CREDENTIALS
+        self.credentials['login'] = u'Вход' # Submit button POST param is required
+
+        # Try to sign in, and try switching to a mirror on failure
+        self.__open_url(self.login_url, self.credentials, check_mirrors=True)
+
+        # Check if login was successful using cookies
+        if not 'bb_session' in [cookie.name for cookie in self.cj]:
+            logging.debug(self.cj)
+            e = ValueError("Unable to connect using given credentials.")
             logging.error(e)
-
-    def __initialize_url(self):
-        """Try to find a reachable RuTracker mirror."""
-        errors = []
-        for mirror in mirrors:
-            try:
-                self.opener.open(mirror)
-                logging.info("Found reachable mirror: {}".format(mirror))
-                return mirror
-            except URLError as e:
-                logging.warning("Could not resolve mirror: {}".format(mirror))
-                errors.append(e)
-        logging.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
-        raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
+            raise e
+        else:
+            logging.info("Login successful.")
 
     def search(self, what: str, cat: str='all') -> None:
         """[Called by qBittorrent from `nova2.py`] Search for what on the search engine."""
@@ -123,7 +107,7 @@ class rutracker(object):
         logging.info("Searching for {}...".format(what))
 
         # Execute first search pass
-        url = self.search_url('nm=' + quote(what))
+        url = self.search_url(urlencode({ 'nm': quote(what) }))
         other_pages = self.__execute_search(url, is_first=True)
         logging.info("{} pages of results found.".format(len(other_pages)+1))
 
@@ -136,16 +120,8 @@ class rutracker(object):
 
     def __execute_search(self, url: str, is_first: bool=False) -> Optional[list]:
         """Execute search query."""
-        try:
-            response = self.opener.open(url)
-            if response.getcode() != 200: # Only continue if response status is OK
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
-        except (URLError, HTTPError) as e:
-            logging.error(e)
-            raise e
-
-        # Decode data
-        data = response.read().decode('cp1251')
+        # Execute search query at URL and decode response bytes
+        data = self.__open_url(url).decode(self.encoding)
 
         # Look for threads/torrent_data
         for thread in self.re_threads.findall(data):
@@ -165,36 +141,61 @@ class rutracker(object):
 
     def __build_result(self, torrent_data: dict) -> dict:
         """Map torrent data to result dict as expected by prettyPrinter."""
+        query = urlencode({ 't': torrent_data['id'] })
         result = {}
-        result['link'] = self.download_url(torrent_data['id'])
+        result['link'] = self.download_url(query)
         result['name'] = unescape(torrent_data['title'])
         result['size'] = torrent_data['size']
         result['seeds'] = torrent_data['seeds']
         result['leech'] = torrent_data['leech']
         result['engine_url'] = 'https://rutracker.org' # We MUST use the same engine URL as the instantiation URL, otherwise downloads will fail, see #15
-        result['desc_link'] = self.topic_url(torrent_data['id'])
+        result['desc_link'] = self.topic_url(query)
         return result
 
     def download_torrent(self, url: str) -> None:
         """[Called by qBittorrent from `nova2dl.py`] Download file at url and write it to a file, print the path to the file and the url."""
-        # Set up fake POST params, needed to trick server into sending the file
-        torrent_id = re.search(r'dl\.php\?t=(?P<id>\d+)', url).group('id')
-        post_params = { 't': torrent_id, }
-        
-        # Download torrent file at url.
-        try:
-            response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
-            if response.getcode() != 200: # Only continue if response status is OK
-                raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
-        except (URLError, HTTPError) as e:
-            logging.error(e)
-            raise e
+        # Download torrent file bytes
+        data = self.__open_url(url)
 
-        # Write to temporary file, then print file path and url as required by plugin API
-        data = response.read()
+        # Write to temporary file, then print file path and URL as required by plugin API
         with NamedTemporaryFile(suffix='.torrent', delete=False) as f:
             f.write(data)
-            print(f.name+" "+url)
+            print(f.name + " " + url)
+
+    def __open_url(self, url: str, post_params=None, check_mirrors=False) -> bytes:
+        """URL request open wrapper returning response bytes if successful."""
+        encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
+        try:
+            with self.opener.open(url, encoded_params or None) as response:
+                if response.getcode() != 200: # Only continue if response status is OK
+                    raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
+                return response.read()
+        except (URLError, HTTPError) as e:
+            if check_mirrors:
+                # If a reachable mirror is found, update engine URL and retry request with new base URL
+                self.url = self.__check_mirrors()
+                new_url = list(urlsplit(url))
+                new_url[0:2] = urlsplit(self.url)[0:2]
+                new_url = urlunsplit(new_url)
+                self.__open_url(new_url, post_params, check_mirrors=False)
+            else:
+                logging.error(e)
+                raise e
+
+    def __check_mirrors(self) -> str:
+        """Try to find a reachable RuTracker mirror."""
+        errors = []
+        for mirror in MIRRORS:
+            try:
+                self.opener.open(mirror)
+                logging.info("Found reachable mirror: {}".format(mirror))
+                return mirror
+            except URLError as e:
+                logging.warning("Could not resolve mirror: {}".format(mirror))
+                errors.append(e)
+        logging.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
+        raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
+
 
 # For testing purposes.
 if __name__ == "__main__":
