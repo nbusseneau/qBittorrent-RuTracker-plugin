@@ -3,18 +3,20 @@
 #VERSION: 2.00
 #AUTHORS: Skymirrh (skymirrh@gmail.com)
 
-# Replace YOUR_USERNAME_HERE and YOUR_PASSWORD_HERE with your RuTracker username and password
-CREDENTIALS = {
-    'login_username': u'YOUR_USERNAME_HERE',
-    'login_password': u'YOUR_PASSWORD_HERE',
-}
+class Config(object):
+    # Replace `YOUR_USERNAME_HERE` and `YOUR_PASSWORD_HERE` with your RuTracker username and password
+    username = u'YOUR_USERNAME_HERE'
+    password = u'YOUR_PASSWORD_HERE'
 
-# List of RuTracker mirrors
-MIRRORS = [
-    'https://rutracker.org',
-    'https://rutracker.net',
-    'https://rutracker.nl',
-]
+    # Configurable list of RuTracker mirrors
+    # Default: official RuTracker URLs
+    mirrors = [
+        'https://rutracker.org',
+        'https://rutracker.net',
+        'https://rutracker.nl',
+    ]
+
+CONFIG = Config()
 
 
 from concurrent.futures import ThreadPoolExecutor
@@ -78,15 +80,18 @@ class rutracker(object):
 
         # If mirror list was updated, check for a reachable mirror immediately
         # Otherwise this will be lazily checked on first login attempt
-        if self.url != MIRRORS[0]:
+        if self.url != CONFIG.mirrors[0]:
             self.url = self.__check_mirrors()
 
         self.__login()
 
     def __login(self) -> None:
         """Set up credentials and try to sign in."""
-        self.credentials = CREDENTIALS
-        self.credentials['login'] = u'Вход' # Submit button POST param is required
+        self.credentials = {
+            'login_username': CONFIG.username,
+            'login_password': CONFIG.password,
+            'login': u'Вход' # Submit button POST param is required
+        }
 
         # Try to sign in, and try switching to a mirror on failure
         self.__open_url(self.login_url, self.credentials, check_mirrors=True)
@@ -188,7 +193,7 @@ class rutracker(object):
     def __check_mirrors(self) -> str:
         """Try to find a reachable RuTracker mirror."""
         errors = []
-        for mirror in MIRRORS:
+        for mirror in CONFIG.mirrors:
             try:
                 self.opener.open(mirror)
                 logger.info("Found reachable mirror: {}".format(mirror))
