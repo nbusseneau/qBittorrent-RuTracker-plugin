@@ -32,8 +32,8 @@ from novaprinter import prettyPrinter
 
 
 # Setup logging
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger()
-logger.setLevel(logging.WARNING)
 
 
 class rutracker(object):
@@ -93,30 +93,30 @@ class rutracker(object):
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
-            logging.debug(self.cj)
+            logger.debug("cookiejar: {}".format(self.cj))
             e = ValueError("Unable to connect using given credentials.")
-            logging.error(e)
+            logger.error(e)
             raise e
         else:
-            logging.info("Login successful.")
+            logger.info("Login successful.")
 
     def search(self, what: str, cat: str='all') -> None:
         """[Called by qBittorrent from `nova2.py`] Search for what on the search engine."""
         self.results = {}
         what = unquote(what)
-        logging.info("Searching for {}...".format(what))
+        logger.info("Searching for {}...".format(what))
 
         # Execute first search pass
         url = self.search_url(urlencode({ 'nm': quote(what) }))
         other_pages = self.__execute_search(url, is_first=True)
-        logging.info("{} pages of results found.".format(len(other_pages)+1))
+        logger.info("{} pages of results found.".format(len(other_pages)+1))
 
         # If others pages of results have been found, repeat search for each page
         with ThreadPoolExecutor() as executor:
             urls = [self.search_url(unescape(page)) for page in other_pages]
             executor.map(self.__execute_search, urls)
 
-        logging.info("{} torrents found.".format(len(self.results)))
+        logger.info("{} torrents found.".format(len(self.results)))
 
     def __execute_search(self, url: str, is_first: bool=False) -> Optional[list]:
         """Execute search query."""
@@ -128,6 +128,7 @@ class rutracker(object):
             match = self.re_torrent_data.search(thread)
             if match:
                 torrent_data = match.groupdict()
+                logger.debug("Torrent data: {}".format(torrent_data))
                 result = self.__build_result(torrent_data)
                 self.results[torrent_data['id']] = result
                 if __name__ != '__main__':
@@ -155,6 +156,7 @@ class rutracker(object):
     def download_torrent(self, url: str) -> None:
         """[Called by qBittorrent from `nova2dl.py`] Download file at url and write it to a file, print the path to the file and the url."""
         # Download torrent file bytes
+        logger.info("Downloading {}...".format(url))
         data = self.__open_url(url)
 
         # Write to temporary file, then print file path and URL as required by plugin API
@@ -167,6 +169,7 @@ class rutracker(object):
         encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
             with self.opener.open(url, encoded_params or None) as response:
+                logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
                 return response.read()
@@ -179,7 +182,7 @@ class rutracker(object):
                 new_url = urlunsplit(new_url)
                 self.__open_url(new_url, post_params, check_mirrors=False)
             else:
-                logging.error(e)
+                logger.error(e)
                 raise e
 
     def __check_mirrors(self) -> str:
@@ -188,20 +191,20 @@ class rutracker(object):
         for mirror in MIRRORS:
             try:
                 self.opener.open(mirror)
-                logging.info("Found reachable mirror: {}".format(mirror))
+                logger.info("Found reachable mirror: {}".format(mirror))
                 return mirror
             except URLError as e:
-                logging.warning("Could not resolve mirror: {}".format(mirror))
+                logger.warning("Could not resolve mirror: {}".format(mirror))
                 errors.append(e)
-        logging.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
+        logger.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
 
 
 # For testing purposes.
 if __name__ == "__main__":
-    import timeit
+    from timeit import timeit
     engine = rutracker()
-    print(timeit.timeit(lambda: engine.search('lazerhawk'), number=1))
-    print(timeit.timeit(lambda: engine.search('ubuntu'), number=1))
-    print(timeit.timeit(lambda: engine.search('space'), number=1))
-    print(timeit.timeit(lambda: engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('lazerhawk'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927'), number=1))
