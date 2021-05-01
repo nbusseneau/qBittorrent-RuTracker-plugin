@@ -56,7 +56,7 @@ class rutracker(object):
         r'.+?'
         r'data-ts_text="(?P<size>\d+?)"'
         r'.+?'
-        r'data-ts_text="(?P<seeds>[-\d]+?)"' # seeds can be negative when distribution status does not allow downloads, see https://rutracker.org/forum/viewtopic.php?t=211216#torstatus
+        r'data-ts_text="(?P<seeds>[-\d]+?)"' # Seeds can be negative when distribution status does not allow downloads, see https://rutracker.org/forum/viewtopic.php?t=211216#torstatus
         r'.+?'
         r'leechmed.+?>(?P<leech>\d+?)<', re.S
     )
@@ -79,22 +79,21 @@ class rutracker(object):
         return self.forum_url + 'viewtopic.php?t=' + torrent_id
 
     def __init__(self):
-        """Initialize RuTracker search engine, signing in using given credentials."""
+        """[Called by qBittorrent from `nova2.py` and `nova2dl.py`] Initialize RuTracker search engine, signing in using given credentials."""
         # Initialize various objects.
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.url = self.__initialize_url() # Override url with the actual URL to be used (in case official URL isn't accessible)
         self.credentials = credentials
-        # Add submit button additional POST param.
-        self.credentials['login'] = u'Вход'
-        # Send POST information and sign in.
+        self.credentials['login'] = u'Вход' # Add submit button additional POST param
+
+        # Send POST information and sign in
         try:
             logging.info("Trying to connect using given credentials.")
             response = self.opener.open(self.login_url, urlencode(dict_encode(self.credentials)).encode())
-            # Check if response status is OK.
-            if response.getcode() != 200:
+            if response.getcode() != 200: # Check if response status is OK
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(self.login_url, response.getcode()), response.info(), None)
-            # Check if login was successful using cookies.
+            # Check if login was successful using cookies
             if not 'bb_session' in [cookie.name for cookie in self.cj]:
                 logging.debug(self.cj)
                 raise ValueError("Unable to connect using given credentials.")
@@ -118,7 +117,7 @@ class rutracker(object):
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
 
     def search(self, what: str, cat: str='all') -> None:
-        """Search for what on the search engine."""
+        """[Called by qBittorrent from `nova2.py`] Search for what on the search engine."""
         self.results = {}
         what = unquote(what)
         logging.info("Searching for {}...".format(what))
@@ -139,8 +138,7 @@ class rutracker(object):
         """Execute search query."""
         try:
             response = self.opener.open(url)
-            # Only continue if response status is OK.
-            if response.getcode() != 200:
+            if response.getcode() != 200: # Only continue if response status is OK
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
@@ -178,7 +176,7 @@ class rutracker(object):
         return result
 
     def download_torrent(self, url: str) -> None:
-        """Download file at url and write it to a file, print the path to the file and the url."""
+        """[Called by qBittorrent from `nova2dl.py`] Download file at url and write it to a file, print the path to the file and the url."""
         # Set up fake POST params, needed to trick server into sending the file
         torrent_id = re.search(r'dl\.php\?t=(?P<id>\d+)', url).group('id')
         post_params = { 't': torrent_id, }
