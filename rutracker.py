@@ -21,9 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 from html import unescape
 import http.cookiejar as cookielib
 import logging
-import os
 import re
-import tempfile
+from tempfile import NamedTemporaryFile
 from typing import Optional
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlencode, quote, unquote
@@ -180,27 +179,24 @@ class rutracker(object):
 
     def download_torrent(self, url: str) -> None:
         """Download file at url and write it to a file, print the path to the file and the url."""
-        # Make temp file.
-        file, path = tempfile.mkstemp('.torrent')
-        file = os.fdopen(file, "wb")
-        # Set up fake POST params, needed to trick the server into sending the file.
-        id = re.search(r'dl\.php\?t=(\d+)', url).group(1)
-        post_params = {'t': id,}
+        # Set up fake POST params, needed to trick server into sending the file
+        torrent_id = re.search(r'dl\.php\?t=(?P<id>\d+)', url).group('id')
+        post_params = { 't': torrent_id, }
+        
         # Download torrent file at url.
         try:
             response = self.opener.open(url, urlencode(dict_encode(post_params)).encode())
-            # Only continue if response status is OK.
-            if response.getcode() != 200:
+            if response.getcode() != 200: # Only continue if response status is OK
                 raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
         except (URLError, HTTPError) as e:
             logging.error(e)
             raise e
-        # Write it to a file.
+
+        # Write to temporary file, then print file path and url as required by plugin API
         data = response.read()
-        file.write(data)
-        file.close()
-        # Print file path and url.
-        print(path+" "+url)
+        with NamedTemporaryFile(suffix='.torrent', delete=False) as f:
+            f.write(data)
+            print(f.name+" "+url)
 
 # For testing purposes.
 if __name__ == "__main__":
