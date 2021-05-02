@@ -8,6 +8,9 @@ class Config(object):
     username = u'YOUR_USERNAME_HERE'
     password = u'YOUR_PASSWORD_HERE'
 
+    # If you want to use magnet links instead of torrent files for downloading, uncomment `download_type`
+    # download_type = 'MAGNET_LINK'
+
     # Configurable list of RuTracker mirrors
     # Default: official RuTracker URLs
     mirrors = [
@@ -16,13 +19,23 @@ class Config(object):
         'https://rutracker.nl',
     ]
 
+    # Configurable list of RuTracker API mirrors
+    # Default: official RuTracker API
+    # Only used when download_type is set to 'MAGNET_LINK'
+    api_mirrors = [
+        'https://api.t-ru.org/v1/',
+    ]
+
 CONFIG = Config()
 
 
 from concurrent.futures import ThreadPoolExecutor
 from html import unescape
 import http.cookiejar as cookielib
+from gzip import BadGzipFile, decompress
+from json import loads
 import logging
+from random import choice
 import re
 from tempfile import NamedTemporaryFile
 from typing import Optional
@@ -38,8 +51,8 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger()
 
 
-class rutracker(object):
-    """RuTracker search engine plugin for qBittorrent."""
+class RuTrackerBase(object):
+    """Base class for RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
     url = 'https://rutracker.org' # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
@@ -81,7 +94,7 @@ class rutracker(object):
         # If mirror list was updated, check for a reachable mirror immediately
         # Otherwise this will be lazily checked on first login attempt
         if self.url != CONFIG.mirrors[0]:
-            self.url = self.__check_mirrors()
+            self.url = self._check_mirrors(CONFIG.mirrors)
 
         self.__login()
 
@@ -94,7 +107,7 @@ class rutracker(object):
         }
 
         # Try to sign in, and try switching to a mirror on failure
-        self.__open_url(self.login_url, self.credentials, check_mirrors=True)
+        self._open_url(self.login_url, self.credentials, check_mirrors=CONFIG.mirrors)
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
@@ -106,7 +119,10 @@ class rutracker(object):
             logger.info("Login successful.")
 
     def search(self, what: str, cat: str='all') -> None:
-        """[Called by qBittorrent from `nova2.py`] Search for what on the search engine."""
+        """[Called by qBittorrent from `nova2.py`] Search for what on the search engine.
+        
+        As expected by qBittorrent API: should print to `stdout` using `prettyPrinter` for each result.
+        """
         self.results = {}
         what = unquote(what)
         logger.info("Searching for {}...".format(what))
@@ -121,12 +137,13 @@ class rutracker(object):
             urls = [self.search_url(unescape(page)) for page in other_pages]
             executor.map(self.__execute_search, urls)
 
-        logger.info("{} torrents found.".format(len(self.results)))
+        # Call "done" handler once done
+        self._search_done_handler()
 
     def __execute_search(self, url: str, is_first: bool=False) -> Optional[list]:
         """Execute search query."""
         # Execute search query at URL and decode response bytes
-        data = self.__open_url(url).decode(self.encoding)
+        data = self._open_url(url).decode(self.encoding)
 
         # Look for threads/torrent_data
         for thread in self.re_threads.findall(data):
@@ -135,9 +152,8 @@ class rutracker(object):
                 torrent_data = match.groupdict()
                 logger.debug("Torrent data: {}".format(torrent_data))
                 result = self.__build_result(torrent_data)
-                self.results[torrent_data['id']] = result
-                if __name__ != '__main__':
-                    prettyPrinter(result)
+                self.results[result['id']] = result
+                self._result_handler(result)
 
         # If doing first search pass, look for other pages
         if is_first:
@@ -149,6 +165,7 @@ class rutracker(object):
         """Map torrent data to result dict as expected by prettyPrinter."""
         query = urlencode({ 't': torrent_data['id'] })
         result = {}
+        result['id'] = torrent_data['id']
         result['link'] = self.download_url(query)
         result['name'] = unescape(torrent_data['title'])
         result['size'] = torrent_data['size']
@@ -158,18 +175,16 @@ class rutracker(object):
         result['desc_link'] = self.topic_url(query)
         return result
 
-    def download_torrent(self, url: str) -> None:
-        """[Called by qBittorrent from `nova2dl.py`] Download file at url and write it to a file, print the path to the file and the url."""
-        # Download torrent file bytes
-        logger.info("Downloading {}...".format(url))
-        data = self.__open_url(url)
+    def _result_handler(self, result: dict) -> None:
+        """Print result to stdout according to qBittorrent API. Will be overriden by subclasses for specific processing."""
+        if __name__ != '__main__':
+            prettyPrinter(result)
 
-        # Write to temporary file, then print file path and URL as required by plugin API
-        with NamedTemporaryFile(suffix='.torrent', delete=False) as f:
-            f.write(data)
-            print(f.name + " " + url)
+    def _search_done_handler(self) -> None:
+        """Log total number of results. Will be overriden by subclasses for specific processing."""
+        logger.info("{} torrents found.".format(len(self.results)))
 
-    def __open_url(self, url: str, post_params=None, check_mirrors=False) -> bytes:
+    def _open_url(self, url: str, post_params=None, check_mirrors=None) -> bytes:
         """URL request open wrapper returning response bytes if successful."""
         encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
@@ -181,19 +196,19 @@ class rutracker(object):
         except (URLError, HTTPError) as e:
             if check_mirrors:
                 # If a reachable mirror is found, update engine URL and retry request with new base URL
-                self.url = self.__check_mirrors()
+                self.url = self._check_mirrors(check_mirrors)
                 new_url = list(urlsplit(url))
                 new_url[0:2] = urlsplit(self.url)[0:2]
                 new_url = urlunsplit(new_url)
-                self.__open_url(new_url, post_params, check_mirrors=False)
+                self._open_url(new_url, post_params, check_mirrors=None)
             else:
                 logger.error(e)
                 raise e
 
-    def __check_mirrors(self) -> str:
-        """Try to find a reachable RuTracker mirror."""
+    def _check_mirrors(self, mirrors: list) -> str:
+        """Try to find a reachable mirror in given list and return its URL."""
         errors = []
-        for mirror in CONFIG.mirrors:
+        for mirror in mirrors:
             try:
                 self.opener.open(mirror)
                 logger.info("Found reachable mirror: {}".format(mirror))
@@ -201,15 +216,159 @@ class rutracker(object):
             except URLError as e:
                 logger.warning("Could not resolve mirror: {}".format(mirror))
                 errors.append(e)
-        logger.error("Unable to resolve any RuTracker mirror -- exiting plugin search")
+        logger.error("Unable to resolve any mirror")
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
+
+
+class RuTrackerTorrentFiles(RuTrackerBase):
+    """Regular search engine downloading torrents via torrent files.
+    
+    Since RuTracker torrent files require to be authenticated for downloading,
+    this version registers the `download_torrent` function, which will be called
+    by qBittorrent to download files through the plugin.
+    """
+    def download_torrent(self, url: str) -> None:
+        """[Called by qBittorrent from `nova2dl.py`] Download torrent file and print filename + URL as required by API"""
+        logger.info("Downloading {}...".format(url))
+        filename = self.__download_torrent_file(url)
+        print(filename + " " + url)
+
+    def __download_torrent_file(self, url: str) -> None:
+        """Download torrent file at URL, write to a local temporary file, and return filename."""
+        # Download torrent file bytes
+        data = self._open_url(url)
+
+        # Write to temporary file, then print file path and URL as required by plugin API
+        with NamedTemporaryFile(suffix='.torrent', delete=False) as f:
+            f.write(data)
+            return f.name
+
+
+class RuTrackerMagnetLinks(RuTrackerBase):
+    """Alternative search engine downloading torrents via magnet links.
+    
+    This version is not recommended for general usage:
+    - It uses the RuTracker API for retrieving torrent hashes, but this may be
+      blocked for you and to my knowledge there are no mirrors at the moment.
+    - (Minor) Retrieving torrents via magnet links is slower than torrent files
+      because of the handshake process, especially if your connection is slow
+      or rate-limited and has troubles connecting to DHT/tracker.
+    - (Minor) This version of the search engine returns result in batches based
+      on the API `get_limit` limit for query parameters. It will be less
+      responsive than the regular version, especially for searches with a huge
+      number of results and if your connection is slow or rate-limited.
+
+    It is however usable from the web GUI, whereas the regular version cannot be
+    used with the web GUI until https://github.com/qbittorrent/qBittorrent/issues/11150
+    is fixed.
+
+    Since magnet links are self-sufficient, RuTracker authentication data is not
+    required for downloading. This version simply does not register the
+    `download_torrent` function expected by the qBittorrent API, in which case
+    qBittorrent simply directly uses result 'link' to download.
+    """
+
+    # RuTracker announcers to be added to magnet links
+    announcers = [
+        'bt.t-ru.org',
+        'bt2.t-ru.org',
+        'bt3.t-ru.org',
+        'bt4.t-ru.org',
+    ]
+    api_url = 'https://api.t-ru.org/v1/'
+
+    @property
+    def limit_url(self) -> str:
+        return self.api_url + 'get_limit'
+
+    @property
+    def hash_url(self) -> str:
+        return self.api_url + 'get_tor_hash'
+
+    def download_url(self, magnet_hash: str) -> str:
+        """Override default download URL and replace it with a magnet link."""
+        announcer = choice(self.announcers)
+        return 'magnet:?xt=urn:btih:{}&http://{}/ann?magnet'.format(magnet_hash, announcer)
+
+    def __init__(self):
+        super().__init__()
+        
+        # If mirror list was updated, check for a reachable mirror immediately
+        # Otherwise this will be lazily checked on first get_limit attempt
+        if self.api_url != CONFIG.api_mirrors[0]:
+            self.api_url = self._check_mirrors(CONFIG.api_mirrors)
+        
+        self.limit = self.__get_limit()
+
+    def __get_limit(self) -> int:
+        """Retrieve RuTracker API limit when passing values to API operations."""
+        data = self._open_url(self.limit_url, check_mirrors=CONFIG.api_mirrors)
+        json = loads(data)
+        logging.debug("get limit | json: {}".format(json))
+        return json['result']['limit']
+
+    def _result_handler(self, result: dict) -> None:
+        """Explicitly do nothing as we want to process results ourselves for magnet links."""
+        pass
+
+    def _search_done_handler(self) -> None:
+        """Build magnet links with the help of RuTracker API after retrieving results, then print to stdout according to qBittorrent API."""
+        all_ids = [torrent_id for torrent_id in self.results.keys()]
+        for chunk in _chunks(all_ids, self.limit):
+            for torrent_id, magnet_hash in self.__retrieve_magnet_hashes(chunk).items():
+                self.results[torrent_id]['link'] = self.download_url(magnet_hash)
+        
+        for result in self.results.values():
+            if __name__ != '__main__':
+                prettyPrinter(result)
+        
+        super()._search_done_handler()
+
+    def __retrieve_magnet_hashes(self, chunk: list) -> dict:
+        """Use RuTracker API to retrieve magnet hashes for a given list of torrent IDs."""
+        query = {
+            'by': 'topic_id',
+            'val': ','.join(chunk),
+        }
+        data = self._open_url(self.hash_url, query)
+        try:
+            json = loads(decompress(data))
+        except BadGzipFile:
+            json = loads(data)
+        logging.debug("retrieve hashes | json: {}".format(json))
+        return json['result']
+
+
+def _chunks(l: list, n: int) -> list:
+    """Yield chunks of max size n from given list."""
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
+
+
+# If configured for using magnet links, register RuTrackerMagnetLinks as engine
+# Otherwise default to registering RuTrackerTorrentFiles
+if hasattr(CONFIG, 'download_type') and CONFIG.download_type == 'MAGNET_LINK':
+    rutracker = RuTrackerMagnetLinks
+else:
+    rutracker = RuTrackerTorrentFiles
 
 
 # For testing purposes.
 if __name__ == "__main__":
     from timeit import timeit
+    logging.info("Testing rutracker...")
     engine = rutracker()
+    logging.info("'{}' registered as 'rutracker'".format(type(engine)))
+
+    logging.info("Testing RuTrackerTorrentFiles...")
+    engine = RuTrackerTorrentFiles()
     logging.info("[timeit] %s", timeit(lambda: engine.search('lazerhawk'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927'), number=1))
+
+    logging.info("Testing RuTrackerMagnetLinks...")
+    engine = RuTrackerMagnetLinks()
+    logging.info("[timeit] %s", timeit(lambda: engine.search('lazerhawk'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
