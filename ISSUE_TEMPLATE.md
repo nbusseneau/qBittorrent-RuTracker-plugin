@@ -1,13 +1,15 @@
-Hello! Before reporting a bug, please review the Troubleshooting instructions:
+Hello! Before reporting a bug, please make sure you reviewed the Troubleshooting instructions:
 
 https://github.com/Skymirrh/qBittorrent-RuTracker-plugin#troubleshooting
 
-Then, fill out of the following form:
+If you're still having an issue, please fill out of the following form:
 
-* Operating System: {type here}
-* qBittorrent version: {type here}
-* Python version: {type here}
-* Output of `python nova2.py rutracker all archlinux`:
+- Operating System: {Windows|Mac|Linux|Docker...}
+- qBittorrent version: {type here}
+- Python version: {type here}
+- Magnet links support enabled: {NO|YES} (unless you manually enabled it, it's NO)
+- Output of `python nova2.py rutracker all archlinux`:
+
 ```
 {output here}
 ```

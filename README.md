@@ -38,7 +38,7 @@ If you get no results from RuTracker when you search something, please:
   - Windows: `%localappdata%\qBittorrent\nova3\engines\`
   - Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
   - OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
-- Edit `rutracker.py` and replace `logger.setLevel(logging.WARNING)` with `logger.setLevel(logging.INFO)`.
+- Edit `rutracker.py` and replace `logging.basicConfig(level=logging.WARNING)` with `logging.basicConfig(level=logging.INFO)`.
 - Move to parent directory (`cd ..` or manual browsing to `nova3`).
 - From the `nova3` directory, run `python nova2.py rutracker all archlinux` in a command prompt.
-- [Create a new issue](https://github.com/Skymirrh/qBittorrent-RuTracker-plugin/issues/new) and fill out the form with the information above.
+- [Create a new issue](https://github.com/Skymirrh/qBittorrent-RuTracker-plugin/issues/new) and fill out the form with the required information.
