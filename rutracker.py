@@ -362,13 +362,15 @@ if __name__ == "__main__":
 
     logging.info("Testing RuTrackerTorrentFiles...")
     engine = RuTrackerTorrentFiles()
-    logging.info("[timeit] %s", timeit(lambda: engine.search('lazerhawk'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('космос'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.download_torrent('https://rutracker.org/forum/dl.php?t=4578927'), number=1))
 
     logging.info("Testing RuTrackerMagnetLinks...")
     engine = RuTrackerMagnetLinks()
-    logging.info("[timeit] %s", timeit(lambda: engine.search('lazerhawk'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
+    logging.info("[timeit] %s", timeit(lambda: engine.search('космос'), number=1))
