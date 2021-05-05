@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """RuTracker search engine plugin for qBittorrent."""
-#VERSION: 2.10
+#VERSION: 2.11
 #AUTHORS: Skymirrh (skymirrh@gmail.com)
 
 class Config(object):
