@@ -128,7 +128,7 @@ class RuTrackerBase(object):
         logger.info("Searching for {}...".format(what))
 
         # Execute first search pass
-        url = self.search_url(urlencode({ 'nm': quote(what) }))
+        url = self.search_url(urlencode({ 'nm': what }))
         other_pages = self.__execute_search(url, is_first=True)
         logger.info("{} pages of results found.".format(len(other_pages)+1))
 
