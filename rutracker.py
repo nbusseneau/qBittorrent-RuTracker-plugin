@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """RuTracker search engine plugin for qBittorrent."""
 #VERSION: 2.11
-#AUTHORS: Skymirrh (skymirrh@gmail.com)
+#AUTHORS: nbusseneau (https://github.com/nbusseneau/qBittorrent-RuTracker-plugin)
 
 class Config(object):
     # Replace `YOUR_USERNAME_HERE` and `YOUR_PASSWORD_HERE` with your RuTracker username and password

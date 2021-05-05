@@ -1,6 +1,6 @@
 Hello! Before reporting a bug, please make sure you reviewed the Troubleshooting instructions:
 
-https://github.com/Skymirrh/qBittorrent-RuTracker-plugin#troubleshooting
+https://github.com/nbusseneau/qBittorrent-RuTracker-plugin#troubleshooting
 
 If you're still having an issue, please fill out of the following form:
 
