@@ -40,7 +40,7 @@ import re
 from tempfile import NamedTemporaryFile
 from typing import Optional
 from urllib.error import URLError, HTTPError
-from urllib.parse import quote, unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import unquote, urlencode, urlsplit, urlunsplit
 from urllib.request import build_opener, HTTPCookieProcessor
 
 from novaprinter import prettyPrinter
