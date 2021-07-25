@@ -288,7 +288,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
     def download_url(self, magnet_hash: str) -> str:
         """Override default download URL and replace it with a magnet link."""
         announcer = choice(self.announcers)
-        return 'magnet:?xt=urn:btih:{}&http://{}/ann?magnet'.format(magnet_hash, announcer)
+        return 'magnet:?xt=urn:btih:{}&tr=http://{}/ann?magnet'.format(magnet_hash, announcer)
 
     def __init__(self):
         super().__init__()
