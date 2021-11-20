@@ -90,6 +90,7 @@ class RuTrackerBase(object):
         """[Called by qBittorrent from `nova2.py` and `nova2dl.py`] Initialize RuTracker search engine, signing in using given credentials."""
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
+        self.opener.addheaders = [('User-Agent', '')]
 
         # If mirror list was updated, check for a reachable mirror immediately
         # Otherwise this will be lazily checked on first login attempt
