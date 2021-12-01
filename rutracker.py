@@ -43,7 +43,22 @@ from urllib.error import URLError, HTTPError
 from urllib.parse import unquote, urlencode, urlsplit, urlunsplit
 from urllib.request import build_opener, HTTPCookieProcessor
 
-from novaprinter import prettyPrinter
+try:
+    import novaprinter
+except ImportError:
+    # When novaprinter is not immediately known as a local module, dynamically
+    # import novaprinter from current or parent directory, allowing to run both
+    # `python engines/rutracker.py` from `nova3` or `python rutracker.py` from
+    # `nova3/engines` without issue
+    import importlib.util
+    try:
+        spec = importlib.util.spec_from_file_location("novaprinter", "nova2.py")
+        novaprinter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(novaprinter)
+    except FileNotFoundError:
+        spec = importlib.util.spec_from_file_location("novaprinter", "../nova2.py")
+        novaprinter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(novaprinter)
 
 
 # Setup logging
@@ -179,7 +194,7 @@ class RuTrackerBase(object):
     def _result_handler(self, result: dict) -> None:
         """Print result to stdout according to qBittorrent API. Will be overriden by subclasses for specific processing."""
         if __name__ != '__main__':
-            prettyPrinter(result)
+            novaprinter.prettyPrinter(result)
 
     def _search_done_handler(self) -> None:
         """Log total number of results. Will be overriden by subclasses for specific processing."""
@@ -321,7 +336,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
         
         for result in self.results.values():
             if __name__ != '__main__':
-                prettyPrinter(result)
+                novaprinter.prettyPrinter(result)
         
         super()._search_done_handler()
 
