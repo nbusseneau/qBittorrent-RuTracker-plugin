@@ -18,10 +18,11 @@ You may also configure your own mirrors.
 
 ## Magnet links support (for web GUI)
 
-- The default version of the plugin downloads torrents via torrent files, which is not supported by the web GUI for now.
-- We provide an alternative version of the plugin downloading via magnet links instead.
-- If you want to use it, uncomment `download_type` in config.
-- Do note that using magnet links is currently NOT recommended for most use cases.
+The default version of the plugin downloads torrents via torrent files, which is not supported by the web GUI for now.
+An alternative version of the plugin is provided and able to download via magnet links instead.
+If you want to use it, uncomment `download_type` in the `Config` section.
+
+Do note that using magnet links is currently NOT recommended for most use cases.
 
 ## Troubleshooting
 
