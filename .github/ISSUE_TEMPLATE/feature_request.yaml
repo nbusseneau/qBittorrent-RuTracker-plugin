@@ -21,7 +21,7 @@ body:
       label: Describe alternatives you've considered
       description: Please provide a clear and concise description of any alternative solutions or features you've considered.
   - type: textarea
-    id: context
+    id: information
     attributes:
-      label: Additional context
-      description: Add any other context or screenshots about the feature request here.
+      label: Additional information
+      description: Add any other information or screenshots about the feature request here.

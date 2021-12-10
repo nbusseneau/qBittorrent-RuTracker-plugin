@@ -63,9 +63,15 @@ body:
           - `python nova2.py rutracker all archlinux`
           - `python engines/rutracker.py`
   - type: textarea
+    id: logs
     attributes:
       label: Output
       description: Copy and paste the output of both commands here. This will be automatically formatted into code, so no need for Markdown backticks.
       render: shell
     validations:
       required: true
+  - type: textarea
+    id: information
+    attributes:
+      label: Additional information
+      description: Add any other information or screenshots about the bug here.
