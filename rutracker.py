@@ -110,7 +110,10 @@ class RuTrackerBase(object):
         """[Called by qBittorrent from `nova2.py` and `nova2dl.py`] Initialize RuTracker search engine, signing in using given credentials."""
         self.cj = cookielib.CookieJar()
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
-        self.opener.addheaders = [('User-Agent', '')]
+        self.opener.addheaders = [
+            ('User-Agent', ''),
+            ('Accept-Encoding', 'gzip, deflate, br'),
+        ]
 
         # If mirror list was updated, check for a reachable mirror immediately
         # Otherwise this will be lazily checked on first login attempt
@@ -213,7 +216,10 @@ class RuTrackerBase(object):
                 logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
-                return response.read()
+                if response.info().get('Content-Encoding') == 'gzip':
+                    return decompress(response.read())
+                else:
+                    return response.read()
         except (URLError, HTTPError) as e:
             if check_mirrors:
                 # If a reachable mirror is found, update engine URL and retry request with new base URL
