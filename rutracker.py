@@ -32,6 +32,13 @@ class Config(object):
     ]
 
 CONFIG = Config()
+DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
+# note: the default engine URL is only used for display purposes in the
+# qBittorrent UI. If the first mirror configured above is not reachable, the
+# actual tracker / download / page URLs will instead be based off one of the
+# reachable ones despite the displayed URL not having changed in the UI. See
+# https://github.com/nbusseneau/qBittorrent-RuTracker-plugin/issues/15 for more
+# details and discussion.
 
 
 from concurrent.futures import ThreadPoolExecutor
@@ -45,7 +52,7 @@ import re
 from tempfile import NamedTemporaryFile
 from typing import Optional
 from urllib.error import URLError, HTTPError
-from urllib.parse import unquote, urlencode, urlsplit, urlunsplit
+from urllib.parse import unquote, urlencode
 from urllib.request import build_opener, HTTPCookieProcessor
 
 try:
@@ -74,7 +81,7 @@ logger = logging.getLogger()
 class RuTrackerBase(object):
     """Base class for RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
-    url = 'https://rutracker.org' # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
+    url = DEFAULT_ENGINE_URL # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
@@ -114,12 +121,6 @@ class RuTrackerBase(object):
             ('User-Agent', ''),
             ('Accept-Encoding', 'gzip, deflate, br'),
         ]
-
-        # If mirror list was updated, check for a reachable mirror immediately
-        # Otherwise this will be lazily checked on first login attempt
-        if self.url != CONFIG.mirrors[0]:
-            self.url = self._check_mirrors(CONFIG.mirrors)
-
         self.__login()
 
     def __login(self) -> None:
@@ -131,7 +132,13 @@ class RuTrackerBase(object):
         }
 
         # Try to sign in, and try switching to a mirror on failure
-        self._open_url(self.login_url, self.credentials, check_mirrors=CONFIG.mirrors)
+        try:
+            self._open_url(self.login_url, self.credentials, log_errors=False)
+        except (URLError, HTTPError):
+            # If a reachable mirror is found, update engine URL and retry request with new base URL
+            logging.info("Checking for RuTracker mirrors...")
+            self.url = self._check_mirrors(CONFIG.mirrors)
+            self._open_url(self.login_url, self.credentials)
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
@@ -195,7 +202,7 @@ class RuTrackerBase(object):
         result['size'] = torrent_data['size']
         result['seeds'] = torrent_data['seeds']
         result['leech'] = torrent_data['leech']
-        result['engine_url'] = 'https://rutracker.org' # We MUST use the same engine URL as the instantiation URL, otherwise downloads will fail, see #15
+        result['engine_url'] = DEFAULT_ENGINE_URL # We MUST use the same engine URL as the instantiation URL, otherwise downloads will fail, see #15
         result['desc_link'] = self.topic_url(query)
         return result
 
@@ -208,7 +215,7 @@ class RuTrackerBase(object):
         """Log total number of results. Will be overriden by subclasses for specific processing."""
         logger.info("{} torrents found.".format(len(self.results)))
 
-    def _open_url(self, url: str, post_params=None, check_mirrors=None) -> bytes:
+    def _open_url(self, url: str, post_params: dict[str, str]=None, log_errors: bool=True) -> bytes:
         """URL request open wrapper returning response bytes if successful."""
         encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
@@ -221,16 +228,9 @@ class RuTrackerBase(object):
                 else:
                     return response.read()
         except (URLError, HTTPError) as e:
-            if check_mirrors:
-                # If a reachable mirror is found, update engine URL and retry request with new base URL
-                self.url = self._check_mirrors(check_mirrors)
-                new_url = list(urlsplit(url))
-                new_url[0:2] = urlsplit(self.url)[0:2]
-                new_url = urlunsplit(new_url)
-                self._open_url(new_url, post_params, check_mirrors=None)
-            else:
+            if log_errors:
                 logger.error(e)
-                raise e
+            raise e
 
     def _check_mirrors(self, mirrors: list) -> str:
         """Try to find a reachable mirror in given list and return its URL."""
@@ -302,7 +302,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
         'bt3.t-ru.org',
         'bt4.t-ru.org',
     ]
-    api_url = 'https://api.t-ru.org/v1/'
+    api_url = CONFIG.api_mirrors[0]
 
     @property
     def limit_url(self) -> str:
@@ -319,17 +319,17 @@ class RuTrackerMagnetLinks(RuTrackerBase):
 
     def __init__(self):
         super().__init__()
-        
-        # If mirror list was updated, check for a reachable mirror immediately
-        # Otherwise this will be lazily checked on first get_limit attempt
-        if self.api_url != CONFIG.api_mirrors[0]:
-            self.api_url = self._check_mirrors(CONFIG.api_mirrors)
-        
         self.limit = self.__get_limit()
 
     def __get_limit(self) -> int:
         """Retrieve RuTracker API limit when passing values to API operations."""
-        data = self._open_url(self.limit_url, check_mirrors=CONFIG.api_mirrors)
+        try:
+            data = self._open_url(self.limit_url, log_errors=False)
+        except (URLError, HTTPError):
+            # If a reachable mirror is found, update API URL and retry request with new base URL
+            logging.info("Checking for RuTracker API mirrors...")
+            self.api_url = self._check_mirrors(CONFIG.api_mirrors)
+            data = self._open_url(self.limit_url, self.credentials)
         json = loads(data)
         logging.debug("get limit | json: {}".format(json))
         return json['result']['limit']
