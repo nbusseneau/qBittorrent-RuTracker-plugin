@@ -13,7 +13,7 @@ You may also configure your own mirrors.
 - Open `rutracker.py` with a text editor, and replace `YOUR_USERNAME_HERE` and `YOUR_PASSWORD_HERE` with your RuTracker username and password.
 - Move `rutracker.py` and `rutracker.png` to qBittorrent search engines directory:
   - Windows: `%localappdata%\qBittorrent\nova3\engines\`
-  - Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
+  - Linux: `~/.local/share/qBittorrent/nova3/engines/`
   - OS X: `~/Library/Application Support/qBittorrent/nova3/engines/`
 - RuTracker search engine should now be available in qBittorrent.
 

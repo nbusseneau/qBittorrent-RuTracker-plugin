@@ -55,7 +55,7 @@ body:
 
         - Navigate to qBittorrent search engines directory:
           - Windows: `%localappdata%\qBittorrent\nova3\engines\`
-          - Linux: `~/.local/share/data/qBittorrent/nova3/engines/`
+          - Linux: `~/.local/share/qBittorrent/nova3/engines/`
           - MacOS: `~/Library/Application Support/qBittorrent/nova3/engines/`
         - Edit `rutracker.py` and replace `logging.basicConfig(level=logging.WARNING)` with `logging.basicConfig(level=logging.INFO)`.
         - Move to parent directory (`cd ..` or manual browsing to `nova3`).
