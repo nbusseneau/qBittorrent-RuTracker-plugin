@@ -223,7 +223,7 @@ class RuTrackerBase(object):
                 logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
-                if response.info().get('Content-Encoding') == 'gzip':
+                if response.info().get('Content-Encoding') is not None:
                     return gzip.decompress(response.read())
                 else:
                     return response.read()
