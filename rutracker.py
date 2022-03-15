@@ -119,7 +119,7 @@ class RuTrackerBase(object):
         self.opener = build_opener(HTTPCookieProcessor(self.cj))
         self.opener.addheaders = [
             ('User-Agent', ''),
-            ('Accept-Encoding', 'gzip, deflate, br'),
+            ('Accept-Encoding', 'gzip, deflate'),
         ]
         self.__login()
 
