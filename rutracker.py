@@ -41,15 +41,15 @@ DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
 # details and discussion.
 
 
-from concurrent.futures import ThreadPoolExecutor
-from html import unescape
+import concurrent.futures
+import html
 import http.cookiejar as cookielib
-from gzip import BadGzipFile, decompress
-from json import loads
+import gzip
+import json
 import logging
-from random import choice
+import random
 import re
-from tempfile import NamedTemporaryFile
+import tempfile
 from typing import Optional
 from urllib.error import URLError, HTTPError
 from urllib.parse import unquote, urlencode
@@ -164,8 +164,8 @@ class RuTrackerBase(object):
         logger.info("{} pages of results found.".format(len(other_pages)+1))
 
         # If others pages of results have been found, repeat search for each page
-        with ThreadPoolExecutor() as executor:
-            urls = [self.search_url(unescape(page)) for page in other_pages]
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            urls = [self.search_url(html.unescape(page)) for page in other_pages]
             executor.map(self.__execute_search, urls)
 
         # Call "done" handler once done
@@ -198,7 +198,7 @@ class RuTrackerBase(object):
         result = {}
         result['id'] = torrent_data['id']
         result['link'] = self.download_url(query)
-        result['name'] = unescape(torrent_data['title'])
+        result['name'] = html.unescape(torrent_data['title'])
         result['size'] = torrent_data['size']
         result['seeds'] = torrent_data['seeds']
         result['leech'] = torrent_data['leech']
@@ -224,7 +224,7 @@ class RuTrackerBase(object):
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
                 if response.info().get('Content-Encoding') == 'gzip':
-                    return decompress(response.read())
+                    return gzip.decompress(response.read())
                 else:
                     return response.read()
         except (URLError, HTTPError) as e:
@@ -266,7 +266,7 @@ class RuTrackerTorrentFiles(RuTrackerBase):
         data = self._open_url(url)
 
         # Write to temporary file, then print file path and URL as required by plugin API
-        with NamedTemporaryFile(suffix='.torrent', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix='.torrent', delete=False) as f:
             f.write(data)
             return f.name
 
@@ -314,7 +314,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
 
     def download_url(self, magnet_hash: str) -> str:
         """Override default download URL and replace it with a magnet link."""
-        announcer = choice(self.announcers)
+        announcer = random.choice(self.announcers)
         return 'magnet:?xt=urn:btih:{}&tr=http://{}/ann?magnet'.format(magnet_hash, announcer)
 
     def __init__(self):
@@ -330,9 +330,9 @@ class RuTrackerMagnetLinks(RuTrackerBase):
             logging.info("Checking for RuTracker API mirrors...")
             self.api_url = self._check_mirrors(CONFIG.api_mirrors)
             data = self._open_url(self.limit_url, self.credentials)
-        json = loads(data)
-        logging.debug("get limit | json: {}".format(json))
-        return json['result']['limit']
+        json_data = json.loads(data)
+        logging.debug("get limit | json: {}".format(json_data))
+        return json_data['result']['limit']
 
     def _result_handler(self, result: dict) -> None:
         """Explicitly do nothing as we want to process results ourselves for magnet links."""
@@ -359,11 +359,11 @@ class RuTrackerMagnetLinks(RuTrackerBase):
         }
         data = self._open_url(self.hash_url, query)
         try:
-            json = loads(decompress(data))
-        except BadGzipFile:
-            json = loads(data)
-        logging.debug("retrieve hashes | json: {}".format(json))
-        return json['result']
+            json_data = json.loads(gzip.decompress(data))
+        except gzip.BadGzipFile:
+            json_data = json.loads(data)
+        logging.debug("retrieve hashes | json: {}".format(json_data))
+        return json_data['result']
 
 
 def _chunks(l: list, n: int) -> list:
