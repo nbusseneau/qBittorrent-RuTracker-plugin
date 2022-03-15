@@ -358,10 +358,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
             'val': ','.join(chunk),
         }
         data = self._open_url(self.hash_url, query)
-        try:
-            json_data = json.loads(gzip.decompress(data))
-        except gzip.BadGzipFile:
-            json_data = json.loads(data)
+        json_data = json.loads(data)
         logging.debug("retrieve hashes | json: {}".format(json_data))
         return json_data['result']
 
