@@ -14,12 +14,12 @@ class Config(object):
 
     # Configurable list of RuTracker mirrors
     # Default: official RuTracker URLs
-    # Note: the .nl mirror is disabled until further notice due to Cloudflare
-    # protection forbidding the plugin from accessing it, see
+    # Note: the .org and .nl mirrors are disabled until further notice due to
+    # Cloudflare protection forbidding the plugin from accessing them, see
     # https://github.com/nbusseneau/qBittorrent-RuTracker-plugin/issues/41 for
     # more details and discussion
     mirrors = [
-        'https://rutracker.org',
+        # 'https://rutracker.org',
         'https://rutracker.net',
         # 'https://rutracker.nl',
     ]
