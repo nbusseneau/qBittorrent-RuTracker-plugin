@@ -87,7 +87,7 @@ class RuTrackerBase(object):
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
     re_torrent_data = re.compile(
-        r'data-topic_id="(?P<id>\d+?)".*?>(?P<title>.+?)<'
+        r'a data-topic_id="(?P<id>\d+?)".*?>(?P<title>.+?)<'
         r'.+?'
         r'data-ts_text="(?P<size>\d+?)"'
         r'.+?'
