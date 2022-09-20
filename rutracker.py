@@ -85,6 +85,7 @@ class RuTrackerBase(object):
     url = DEFAULT_ENGINE_URL # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
     loginFailed = None
+    clientError = False
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
@@ -98,13 +99,19 @@ class RuTrackerBase(object):
         r'leechmed.+?>(?P<leech>\d+?)<', re.S
     )
 
+    @staticmethod
+    def make_forum_url(url) -> str:
+        return url + '/forum/'
     @property
     def forum_url(self) -> str:
-        return self.url + '/forum/'
+        return RuTrackerBase.make_forum_url(self.url)
 
+    @staticmethod
+    def make_login_url(url) -> str:
+        return RuTrackerBase.make_forum_url(url) + 'login.php'
     @property
     def login_url(self) -> str:
-        return self.forum_url + 'login.php'
+        return RuTrackerBase.make_login_url(self.url)
 
     def search_url(self, query: str) -> str:
         return self.forum_url + 'tracker.php?' + query
@@ -137,13 +144,28 @@ class RuTrackerBase(object):
         }
 
         # Try to sign in, and try switching to a mirror on failure
+        needMirror = False
         try:
             self._open_url(self.login_url, self.credentials, log_errors=False)
-        except (URLError, HTTPError):
+        except HTTPError as e:
+            if e.code == 401 or e.code == 403:
+                e = ValueError("Unable to connect using the given credentials.")
+                self.clientError = True
+                logger.error(e)
+                raise e
+            elif 400 <= e.code and e.code < 500:
+                e = ValueError("Unknown client error {0}.".format(e.code))
+                self.clientError = True
+                logger.error(e)
+                raise e
+            needMirror = True
+        except (URLError, TimeoutError) as e:
+            needMirror = True
+
+        if needMirror:
             # If a reachable mirror is found, update engine URL and retry request with new base URL
             logging.info("Checking for RuTracker mirrors...")
-            self.url = self._check_mirrors(CONFIG.mirrors)
-            self._open_url(self.login_url, self.credentials)
+            self.url = self._check_mirrors(CONFIG.mirrors, lambda url : RuTrackerBase.make_login_url(url), self.credentials)
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
