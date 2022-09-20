@@ -146,7 +146,7 @@ class RuTrackerBase(object):
         # Try to sign in, and try switching to a mirror on failure
         needMirror = False
         try:
-            self._open_url(self.login_url, self.credentials, log_errors=False)
+            self._open_url(self.login_url, self.credentials, log_errors=False, timeout=1.0)
         except HTTPError as e:
             if e.code == 401 or e.code == 403:
                 e = ValueError("Unable to connect using the given credentials.")
@@ -253,11 +253,11 @@ class RuTrackerBase(object):
         """Log total number of results. Will be overriden by subclasses for specific processing."""
         logger.info("{} torrents found.".format(len(self.results)))
 
-    def _open_url(self, url: str, post_params: dict[str, str]=None, log_errors: bool=True) -> bytes:
+    def _open_url(self, url: str, post_params: dict[str, str]=None, log_errors: bool=True, timeout: float=2.0) -> bytes:
         """URL request open wrapper returning response bytes if successful."""
         encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
-            with self.opener.open(url, encoded_params or None) as response:
+            with self.opener.open(url, encoded_params or None, timeout=timeout) as response:
                 logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
@@ -265,22 +265,38 @@ class RuTrackerBase(object):
                     return gzip.decompress(response.read())
                 else:
                     return response.read()
-        except (URLError, HTTPError) as e:
+        except (HTTPError, URLError, TimeoutError) as e:
             if log_errors:
                 logger.error(e)
             raise e
 
-    def _check_mirrors(self, mirrors: list) -> str:
+
+    def _check_mirrors(self, mirrors: list, urlConvert = None, postParams: dict[str, str] = None) -> str:
         """Try to find a reachable mirror in given list and return its URL."""
         errors = []
-        for mirror in mirrors:
+
+        def check_mirror(mirror: str) -> str:
+            url = urlConvert(mirror) if urlConvert else mirror
             try:
-                self.opener.open(mirror)
+                self._open_url(url, postParams, log_errors=False)
                 logger.info("Found reachable mirror: {}".format(mirror))
                 return mirror
-            except URLError as e:
+            except HTTPError as e:
+                logger.warning("Mirror {} error: {}".format(mirror, e.code))
+                errors.append(e)
+                raise e
+            except (URLError, TimeoutError) as e:
                 logger.warning("Could not resolve mirror: {}".format(mirror))
                 errors.append(e)
+                raise e
+
+        with concurrent.futures.ThreadPoolExecutor(len(mirrors)) as executor:
+            futureList = [executor.submit(check_mirror, mirror) for mirror in mirrors]
+            while len(futureList) != 0:
+                done, futureList = concurrent.futures.wait(futureList, return_when=concurrent.futures.FIRST_COMPLETED)
+                for future in done:
+                    if not future.cancelled() and not future.exception():
+                        return future.result()
         logger.error("Unable to resolve any mirror")
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
 
@@ -363,7 +379,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
         """Retrieve RuTracker API limit when passing values to API operations."""
         try:
             data = self._open_url(self.limit_url, log_errors=False)
-        except (URLError, HTTPError):
+        except (URLError, HTTPError, TimeoutError):
             # If a reachable mirror is found, update API URL and retry request with new base URL
             logging.info("Checking for RuTracker API mirrors...")
             self.api_url = self._check_mirrors(CONFIG.api_mirrors)
