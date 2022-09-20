@@ -27,6 +27,10 @@ class Config(object):
         'https://api.t-ru.org/v1/',
     ]
 
+    # If the server connection or logging in fails, the number of seconds to retry logging in
+    # Default: 10 seconds
+    retry_login = 10.0
+
 CONFIG = Config()
 DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
 # note: the default engine URL is only used for display purposes in the
@@ -46,6 +50,7 @@ import logging
 import random
 import re
 import tempfile
+import time
 from typing import Optional
 from urllib.error import URLError, HTTPError
 from urllib.parse import unquote, urlencode
@@ -79,6 +84,7 @@ class RuTrackerBase(object):
     name = 'RuTracker'
     url = DEFAULT_ENGINE_URL # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
+    loginFailed = None
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
@@ -117,7 +123,10 @@ class RuTrackerBase(object):
             ('User-Agent', ''),
             ('Accept-Encoding', 'gzip, deflate'),
         ]
-        self.__login()
+        try:
+            self.__login()
+        except:
+            self.loginFailed = time.monotonic()
 
     def __login(self) -> None:
         """Set up credentials and try to sign in."""
@@ -150,6 +159,17 @@ class RuTrackerBase(object):
         
         As expected by qBittorrent API: should print to `stdout` using `prettyPrinter` for each result.
         """
+        if self.loginFailed:
+            elapsed = time.monotonic() - self.loginFailed
+            self.loginFailed += elapsed
+            if (self.clientError or elapsed < Config.retry_login):
+                return
+            else:
+                try:
+                    self.__login()
+                    self.loginFailed = None
+                except:
+                    return
         self.results = {}
         what = unquote(what)
         logger.info("Searching for {}...".format(what))
@@ -373,15 +393,18 @@ else:
     rutracker = RuTrackerTorrentFiles
 
 
-# For testing purposes.
-if __name__ == "__main__":
+def main():
     from timeit import timeit
     logging.info("Testing rutracker...")
     engine = rutracker()
+    if engine.loginFailed:
+        return
     logging.info("'{}' registered as 'rutracker'".format(type(engine)))
 
     logging.info("Testing RuTrackerTorrentFiles...")
     engine = RuTrackerTorrentFiles()
+    if engine.loginFailed:
+        return
     logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
@@ -390,7 +413,14 @@ if __name__ == "__main__":
 
     logging.info("Testing RuTrackerMagnetLinks...")
     engine = RuTrackerMagnetLinks()
+    if engine.loginFailed:
+        return
     logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('космос'), number=1))
+
+
+# For testing purposes.
+if __name__ == "__main__":
+    main()
