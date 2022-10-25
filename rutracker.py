@@ -42,6 +42,7 @@ DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
 
 
 import concurrent.futures
+from enum import Enum, auto, unique
 import html
 import http.cookiejar as cookielib
 import gzip
@@ -80,12 +81,39 @@ logger = logging.getLogger()
 
 
 class RuTrackerBase(object):
+    @unique
+    class ErrorType(Enum):
+        OK = auto()
+        CONNECTION = auto()
+        CREDENTIALS = auto()
+        CAPTCHA = auto()
+        CLIENT = auto()
+        SERVER = auto()
+        UNKNOWN = auto()
+        def __str__(self):
+            if self.value == self.OK.value:
+                return "No error happened."
+            elif self.value == self.CONNECTION.value:
+                return "Unable to connect to the server."
+            elif self.value == self.CREDENTIALS.value:
+                return "Unable to connect using the given credentials. Please update your credentials."
+            elif self.value == self.CAPTCHA.value:
+                return "The server requires CAPTCHA verification. Please re-login in your browser."
+            elif self.value == self.CLIENT.value:
+                return "Unknown client error {0}.".format(self.code or 0)
+            elif self.value == self.SERVER.value:
+                return "The server returned an error {0}.".format(self.code or 0)
+            elif self.value == self.UNKNOWN.value:
+                return "An unknown error happened. Please check your search settings."
+        def badClient(self):
+            return self.value in [self.CREDENTIALS.value, self.CLIENT.value]
+
     """Base class for RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
     url = DEFAULT_ENGINE_URL # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
     loginFailed = None
-    clientError = False
+    errorType = ErrorType.OK
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
@@ -144,22 +172,25 @@ class RuTrackerBase(object):
         }
 
         # Try to sign in, and try switching to a mirror on failure
+        self.errorType = self.ErrorType.OK
         needMirror = False
         try:
-            self._open_url(self.login_url, self.credentials, log_errors=False, timeout=1.0)
+            html = self._open_url(self.login_url, self.credentials, log_errors=False, timeout=1.0).decode(self.encoding)
+            if 'неверное/неактивное имя пользователя' in html:
+                self.errorType = self.ErrorType.CREDENTIALS
+            elif 'код подтверждения' in html:
+                self.errorType = self.ErrorType.CAPTCHA
         except HTTPError as e:
             if e.code == 401 or e.code == 403:
-                e = ValueError("Unable to connect using the given credentials.")
-                self.clientError = True
-                logger.error(e)
-                raise e
+                self.errorType = self.ErrorType.CREDENTIALS
             elif 400 <= e.code and e.code < 500:
-                e = ValueError("Unknown client error {0}.".format(e.code))
-                self.clientError = True
-                logger.error(e)
-                raise e
-            needMirror = True
+                self.errorType = self.ErrorType.CLIENT
+            else:
+                self.errorType = self.ErrorType.SERVER if 500 <= e.code else self.ErrorType.UNKNOWN
+                needMirror = True
+            self.errorType.code = e.code
         except (URLError, TimeoutError) as e:
+            self.errorType = self.ErrorType.CONNECTION
             needMirror = True
 
         if needMirror:
@@ -169,10 +200,11 @@ class RuTrackerBase(object):
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
+            if self.errorType == self.ErrorType.OK:
+                self.errorType = self.ErrorType.UNKNOWN
             logger.debug("cookiejar: {}".format(self.cj))
-            e = ValueError("Unable to connect using given credentials.")
-            logger.error(e)
-            raise e
+            logger.error(self.errorType)
+            raise self.errorType
         else:
             logger.info("Login successful.")
 
@@ -184,14 +216,14 @@ class RuTrackerBase(object):
         if self.loginFailed:
             elapsed = time.monotonic() - self.loginFailed
             self.loginFailed += elapsed
-            if (self.clientError or elapsed < Config.retry_login):
-                return
+            if (self.errorType.badClient() or elapsed < Config.retry_login):
+                return self.__prettyPrintError()
             else:
                 try:
                     self.__login()
                     self.loginFailed = None
                 except:
-                    return
+                    return self.__prettyPrintError()
         self.results = {}
         what = unquote(what)
         logger.info("Searching for {}...".format(what))
@@ -299,6 +331,18 @@ class RuTrackerBase(object):
                         return future.result()
         logger.error("Unable to resolve any mirror")
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
+
+    def __prettyPrintError(self):
+        result = {}
+        result['id'] = 0
+        result['link'] = ''
+        result['name'] = str(self.errorType)
+        result['size'] = 0
+        result['seeds'] = 0
+        result['leech'] = 0
+        result['engine_url'] = DEFAULT_ENGINE_URL
+        result['desc_link'] = ''
+        self._result_handler(result)
 
 
 class RuTrackerTorrentFiles(RuTrackerBase):
