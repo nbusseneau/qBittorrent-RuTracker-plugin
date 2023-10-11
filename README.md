@@ -18,6 +18,9 @@ You may also configure your own mirrors.
 
 ## Magnet links support (for web GUI)
 
+> [!WARNING]  
+> This is not working anymore as the RuTracker torrent API is seemingly gone, hence it is not possible for the plugin to retrieve magnet links anymore.
+
 The default version of the plugin downloads torrents via torrent files, which is not supported by the web GUI for now.
 An alternative version of the plugin is provided and able to download via magnet links instead.
 If you want to use it, uncomment `download_type` in the `Config` section.
