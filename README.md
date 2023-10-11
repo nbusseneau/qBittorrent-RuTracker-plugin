@@ -19,7 +19,8 @@ You may also configure your own mirrors.
 ## Magnet links support (for web GUI)
 
 > [!WARNING]  
-> This is not working anymore as the RuTracker torrent API is seemingly gone, hence it is not possible for the plugin to retrieve magnet links anymore.
+> This is not working anymore as the RuTracker torrent API is seemingly gone, hence it is not possible for the plugin to retrieve magnet links.
+> To download RuTracker torrents from the web GUI, you'll probably want to switch to [using the Jackett plugin instead](https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin).
 
 The default version of the plugin downloads torrents via torrent files, which is not supported by the web GUI for now.
 An alternative version of the plugin is provided and able to download via magnet links instead.
