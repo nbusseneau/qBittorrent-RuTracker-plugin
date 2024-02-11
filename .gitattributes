@@ -5,7 +5,9 @@
 *.py eol=crlf
 *.md eol=crlf
 
-# Remove files from deployment using 'git archive'
-# git files
+# Exclude files from 'git archive'
 .gitattributes export-ignore
+.github export-ignore
 .gitignore export-ignore
+.gitmodules export-ignore
+_config.yml export-ignore
