@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """RuTracker search engine plugin for qBittorrent."""
-#VERSION: 2.19
+#VERSION: 2.20
 #AUTHORS: nbusseneau (https://github.com/nbusseneau/qBittorrent-RuTracker-plugin)
 
 class Config(object):
@@ -27,6 +27,10 @@ class Config(object):
         'https://api.t-ru.org/v1/',
     ]
 
+    # If the server connection or logging in fails, the number of seconds to retry logging in
+    # Default: 10 seconds
+    retry_login = 10.0
+
 CONFIG = Config()
 DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
 # note: the default engine URL is only used for display purposes in the
@@ -38,6 +42,7 @@ DEFAULT_ENGINE_URL = CONFIG.mirrors[0]
 
 
 import concurrent.futures
+from enum import Enum, auto, unique
 import html
 import http.cookiejar as cookielib
 import gzip
@@ -46,6 +51,7 @@ import logging
 import random
 import re
 import tempfile
+import time
 from typing import Optional
 from urllib.error import URLError, HTTPError
 from urllib.parse import unquote, urlencode
@@ -75,10 +81,39 @@ logger = logging.getLogger()
 
 
 class RuTrackerBase(object):
+    @unique
+    class ErrorType(Enum):
+        OK = auto()
+        CONNECTION = auto()
+        CREDENTIALS = auto()
+        CAPTCHA = auto()
+        CLIENT = auto()
+        SERVER = auto()
+        UNKNOWN = auto()
+        def __str__(self):
+            if self.value == self.OK.value:
+                return "No error happened."
+            elif self.value == self.CONNECTION.value:
+                return "Unable to connect to the server."
+            elif self.value == self.CREDENTIALS.value:
+                return "Unable to connect using the given credentials. Please update your credentials."
+            elif self.value == self.CAPTCHA.value:
+                return "The server requires CAPTCHA verification. Please re-login in your browser."
+            elif self.value == self.CLIENT.value:
+                return "Unknown client error {0}.".format(self.code or 0)
+            elif self.value == self.SERVER.value:
+                return "The server returned an error {0}.".format(self.code or 0)
+            elif self.value == self.UNKNOWN.value:
+                return "An unknown error happened. Please check your search settings."
+        def badClient(self):
+            return self.value in [self.CREDENTIALS.value, self.CLIENT.value]
+
     """Base class for RuTracker search engine plugin for qBittorrent."""
     name = 'RuTracker'
     url = DEFAULT_ENGINE_URL # We MUST produce an URL attribute at instantiation time, otherwise qBittorrent will fail to register the engine, see #15
     encoding = 'cp1251'
+    loginFailed = None
+    errorType = ErrorType.OK
 
     re_search_queries = re.compile(r'<a.+?href="tracker\.php\?(.*?start=\d+)"')
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
@@ -92,13 +127,19 @@ class RuTrackerBase(object):
         r'leechmed.+?>(?P<leech>\d+?)<', re.S
     )
 
+    @staticmethod
+    def make_forum_url(url) -> str:
+        return url + '/forum/'
     @property
     def forum_url(self) -> str:
-        return self.url + '/forum/'
+        return RuTrackerBase.make_forum_url(self.url)
 
+    @staticmethod
+    def make_login_url(url) -> str:
+        return RuTrackerBase.make_forum_url(url) + 'login.php'
     @property
     def login_url(self) -> str:
-        return self.forum_url + 'login.php'
+        return RuTrackerBase.make_login_url(self.url)
 
     def search_url(self, query: str) -> str:
         return self.forum_url + 'tracker.php?' + query
@@ -117,7 +158,10 @@ class RuTrackerBase(object):
             ('User-Agent', ''),
             ('Accept-Encoding', 'gzip, deflate'),
         ]
-        self.__login()
+        try:
+            self.__login()
+        except:
+            self.loginFailed = time.monotonic()
 
     def __login(self) -> None:
         """Set up credentials and try to sign in."""
@@ -128,20 +172,39 @@ class RuTrackerBase(object):
         }
 
         # Try to sign in, and try switching to a mirror on failure
+        self.errorType = self.ErrorType.OK
+        needMirror = False
         try:
-            self._open_url(self.login_url, self.credentials, log_errors=False)
-        except (URLError, HTTPError):
+            html = self._open_url(self.login_url, self.credentials, log_errors=False, timeout=1.0).decode(self.encoding)
+            if 'неверное/неактивное имя пользователя' in html:
+                self.errorType = self.ErrorType.CREDENTIALS
+            elif 'код подтверждения' in html:
+                self.errorType = self.ErrorType.CAPTCHA
+        except HTTPError as e:
+            if e.code == 401 or e.code == 403:
+                self.errorType = self.ErrorType.CREDENTIALS
+            elif 400 <= e.code and e.code < 500:
+                self.errorType = self.ErrorType.CLIENT
+            else:
+                self.errorType = self.ErrorType.SERVER if 500 <= e.code else self.ErrorType.UNKNOWN
+                needMirror = True
+            self.errorType.code = e.code
+        except (URLError, TimeoutError) as e:
+            self.errorType = self.ErrorType.CONNECTION
+            needMirror = True
+
+        if needMirror:
             # If a reachable mirror is found, update engine URL and retry request with new base URL
             logging.info("Checking for RuTracker mirrors...")
-            self.url = self._check_mirrors(CONFIG.mirrors)
-            self._open_url(self.login_url, self.credentials)
+            self.url = self._check_mirrors(CONFIG.mirrors, lambda url : RuTrackerBase.make_login_url(url), self.credentials)
 
         # Check if login was successful using cookies
         if not 'bb_session' in [cookie.name for cookie in self.cj]:
+            if self.errorType == self.ErrorType.OK:
+                self.errorType = self.ErrorType.UNKNOWN
             logger.debug("cookiejar: {}".format(self.cj))
-            e = ValueError("Unable to connect using given credentials.")
-            logger.error(e)
-            raise e
+            logger.error(self.errorType)
+            raise self.errorType
         else:
             logger.info("Login successful.")
 
@@ -150,6 +213,17 @@ class RuTrackerBase(object):
         
         As expected by qBittorrent API: should print to `stdout` using `prettyPrinter` for each result.
         """
+        if self.loginFailed:
+            elapsed = time.monotonic() - self.loginFailed
+            self.loginFailed += elapsed
+            if (self.errorType.badClient() or elapsed < Config.retry_login):
+                return self.__prettyPrintError()
+            else:
+                try:
+                    self.__login()
+                    self.loginFailed = None
+                except:
+                    return self.__prettyPrintError()
         self.results = {}
         what = unquote(what)
         logger.info("Searching for {}...".format(what))
@@ -211,11 +285,11 @@ class RuTrackerBase(object):
         """Log total number of results. Will be overriden by subclasses for specific processing."""
         logger.info("{} torrents found.".format(len(self.results)))
 
-    def _open_url(self, url: str, post_params: dict[str, str]=None, log_errors: bool=True) -> bytes:
+    def _open_url(self, url: str, post_params: dict[str, str]=None, log_errors: bool=True, timeout: float=2.0) -> bytes:
         """URL request open wrapper returning response bytes if successful."""
         encoded_params = urlencode(post_params, encoding=self.encoding).encode() if post_params else None
         try:
-            with self.opener.open(url, encoded_params or None) as response:
+            with self.opener.open(url, encoded_params or None, timeout=timeout) as response:
                 logger.debug("HTTP request: {} | status: {}".format(url, response.getcode()))
                 if response.getcode() != 200: # Only continue if response status is OK
                     raise HTTPError(response.geturl(), response.getcode(), "HTTP request to {} failed with status: {}".format(url, response.getcode()), response.info(), None)
@@ -223,24 +297,52 @@ class RuTrackerBase(object):
                     return gzip.decompress(response.read())
                 else:
                     return response.read()
-        except (URLError, HTTPError) as e:
+        except (HTTPError, URLError, TimeoutError) as e:
             if log_errors:
                 logger.error(e)
             raise e
 
-    def _check_mirrors(self, mirrors: list) -> str:
+
+    def _check_mirrors(self, mirrors: list, urlConvert = None, postParams: dict[str, str] = None) -> str:
         """Try to find a reachable mirror in given list and return its URL."""
         errors = []
-        for mirror in mirrors:
+
+        def check_mirror(mirror: str) -> str:
+            url = urlConvert(mirror) if urlConvert else mirror
             try:
-                self.opener.open(mirror)
+                self._open_url(url, postParams, log_errors=False)
                 logger.info("Found reachable mirror: {}".format(mirror))
                 return mirror
-            except URLError as e:
+            except HTTPError as e:
+                logger.warning("Mirror {} error: {}".format(mirror, e.code))
+                errors.append(e)
+                raise e
+            except (URLError, TimeoutError) as e:
                 logger.warning("Could not resolve mirror: {}".format(mirror))
                 errors.append(e)
+                raise e
+
+        with concurrent.futures.ThreadPoolExecutor(len(mirrors)) as executor:
+            futureList = [executor.submit(check_mirror, mirror) for mirror in mirrors]
+            while len(futureList) != 0:
+                done, futureList = concurrent.futures.wait(futureList, return_when=concurrent.futures.FIRST_COMPLETED)
+                for future in done:
+                    if not future.cancelled() and not future.exception():
+                        return future.result()
         logger.error("Unable to resolve any mirror")
         raise RuntimeError("\n{}".format("\n".join([str(error) for error in errors])))
+
+    def __prettyPrintError(self):
+        result = {}
+        result['id'] = 0
+        result['link'] = ''
+        result['name'] = str(self.errorType)
+        result['size'] = 0
+        result['seeds'] = 0
+        result['leech'] = 0
+        result['engine_url'] = DEFAULT_ENGINE_URL
+        result['desc_link'] = ''
+        self._result_handler(result)
 
 
 class RuTrackerTorrentFiles(RuTrackerBase):
@@ -321,7 +423,7 @@ class RuTrackerMagnetLinks(RuTrackerBase):
         """Retrieve RuTracker API limit when passing values to API operations."""
         try:
             data = self._open_url(self.limit_url, log_errors=False)
-        except (URLError, HTTPError):
+        except (URLError, HTTPError, TimeoutError):
             # If a reachable mirror is found, update API URL and retry request with new base URL
             logging.info("Checking for RuTracker API mirrors...")
             self.api_url = self._check_mirrors(CONFIG.api_mirrors)
@@ -373,15 +475,18 @@ else:
     rutracker = RuTrackerTorrentFiles
 
 
-# For testing purposes.
-if __name__ == "__main__":
+def main():
     from timeit import timeit
     logging.info("Testing rutracker...")
     engine = rutracker()
+    if engine.loginFailed:
+        return
     logging.info("'{}' registered as 'rutracker'".format(type(engine)))
 
     logging.info("Testing RuTrackerTorrentFiles...")
     engine = RuTrackerTorrentFiles()
+    if engine.loginFailed:
+        return
     logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
@@ -390,7 +495,14 @@ if __name__ == "__main__":
 
     logging.info("Testing RuTrackerMagnetLinks...")
     engine = RuTrackerMagnetLinks()
+    if engine.loginFailed:
+        return
     logging.info("[timeit] %s", timeit(lambda: engine.search('arch linux'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('ubuntu'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('space'), number=1))
     logging.info("[timeit] %s", timeit(lambda: engine.search('космос'), number=1))
+
+
+# For testing purposes.
+if __name__ == "__main__":
+    main()
