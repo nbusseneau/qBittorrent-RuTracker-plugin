@@ -74,12 +74,15 @@ class RuTracker(object):
     re_threads = re.compile(r'<tr id="trs-tr-\d+".*?</tr>', re.S)
     re_torrent_data = re.compile(
         r'a data-topic_id="(?P<id>\d+?)".*?>(?P<title>.+?)<'
-        r'.+?'
+        r".+?"
         r'data-ts_text="(?P<size>\d+?)"'
-        r'.+?'
-        r'data-ts_text="(?P<seeds>[-\d]+?)"' # Seeds can be negative when distribution status does not allow downloads, see https://rutracker.org/forum/viewtopic.php?t=211216#torstatus
-        r'.+?'
-        r'leechmed.+?>(?P<leech>\d+?)<', re.S
+        r".+?"
+        r'data-ts_text="(?P<seeds>[-\d]+?)"'  # Seeds can be negative when distribution status does not allow downloads, see https://rutracker.org/forum/viewtopic.php?t=211216#torstatus
+        r".+?"
+        r"leechmed.+?>(?P<leech>\d+?)<"
+        r".+?"
+        r'data-ts_text="(?P<pub_date>\d+?)"',
+        re.S,
     )
 
     @property
@@ -193,6 +196,7 @@ class RuTracker(object):
             DEFAULT_ENGINE_URL  # We MUST use the same engine URL as the instantiation URL, otherwise downloads will fail, see #15
         )
         result["desc_link"] = self.topic_url(query)
+        result["pub_date"] = torrent_data["pub_date"]
         return result
 
     def _open_url(
