@@ -1,3 +1,13 @@
+# ⚠️ DEPRECATION WARNING
+
+As of July 2026, RuTracker has enabled the newest Cloudflare protections on the website, which this plugin cannot bypass.
+To do so would require implementing a full-blown JS engine, which goes against this plugin's philosophy as my goal has always been to keep it as simple as possible both in terms of code and installation (all in a single file, only Python Standard Library, no external packages).
+
+RuTracker has a history of enabling / disabling Cloudflare protections so it may well work again in a few days or weeks, but if it does not then it will be the end of this plugin.
+You may want to try to switch to more complex solutions such as the [Jackett plugin](https://github.com/qbittorrent/search-plugins/wiki/How-to-configure-Jackett-plugin) instead, which seems to support Cloudflare bypasses.
+
+Sorry folks! Thank you all for using this plugin, it was a good run: 13 years, which is most honorable! 🫡
+
 # qBittorrent RuTracker plugin
 
 qBittorrent search engine plugin for ![](./rutracker.png) RuTracker.
